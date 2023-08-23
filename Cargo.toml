@@ -6,9 +6,17 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.75"
-crossterm = "0.27.0"
-reqwest = { version = "0.11", features = ["blocking"] }
-rss = { version = "2.0.6", features = ["atom"] }
+anyhow = "1"
+colorsys = "0.6.7"
+crossterm = "0.27"
+directories = "5"
+gluesql = { version = "0.14", default-features = false, features = [
+    "sled-storage",
+] }
+reqwest = { version = "0.11" }
+rss = { version = "2", features = ["atom"] }
+serde = { version = "1", features = ["derive"] }
+serde_yaml = "0.9.25"
 tokio = { version = "1", features = ["full"] }
+toml = "0.7.6"
 tui = { package = "ratatui", version = "0.22.0", features = ["all-widgets"] }

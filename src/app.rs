@@ -1,7 +1,7 @@
-use std::error;
-
-use crate::feed;
+use crate::{config::Config, db::Database};
+use anyhow::Result;
 use rss::{Channel, Item};
+use std::error;
 use tui::widgets::ListState;
 
 /// Application result type.
@@ -10,53 +10,47 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 /// Application.
 #[derive(Debug)]
 pub struct App {
+    pub config: Config,
+    pub db: Database,
     pub running: bool,
     pub feeds: StatefulList<Channel>,
     pub items: StatefulList<Item>,
     pub active_view: ActiveView,
 }
 
-impl Default for App {
-    fn default() -> Self {
-        const ITEMS: [&'static str; 16] = [
-            "https://100r.co/links/rss.xml",
-            "https://abeautifulmess.com/feed",
-            "https://ayearofreadingtheworld.com/feed/",
-            "http://feeds.bbci.co.uk/news/world/rss.xml",
-            "https://medium.com/feed/better-programming",
-            "https://overreacted.io/rss.xml",
-            "https://feeds.feedburner.com/dancarlin/history?format=xml",
-            "http://feeds.arstechnica.com/arstechnica/index/",
-            "https://hackaday.com/blog/feed/",
-            "https://medium.com/feed/hackernoon",
-            "https://blog.jetbrains.com/feed",
-            "https://www.newinbooks.com/feed/",
-            "https://www.theonion.com/rss",
-            "https://tty1.blog/feed/",
-            "https://www.wired.com/feed/rss",
-            "https://xkcd.com/rss.xml",
-        ];
+impl App {
+    pub async fn init(config: Config) -> Result<Self> {
+        let urls = config.feed_urls();
+        let mut items: Vec<Channel> = Vec::with_capacity(urls.len());
 
-        let items = ITEMS
-            .iter()
-            .filter_map(|url| {
-                let res = reqwest::blocking::get(*url).unwrap().bytes().unwrap();
-                Channel::read_from(&res[..]).ok()
-            })
-            .collect::<Vec<Channel>>();
+        for url in urls {
+            let res = reqwest::get(url).await?.bytes().await?;
+            if let Ok(channel) = Channel::read_from(&res[..]) {
+                items.push(channel);
+            }
+        }
 
-        Self {
+        // async {
+        //     let items = config
+        //         .feed_urls()
+        //         .iter()
+        //         .filter_map(|url| {
+        //             let res = reqwest::get(url).await?;
+        //             let res = res.bytes().unwrap();
+        //             Channel::read_from(&res[..]).ok()
+        //         })
+        //         .collect::<Vec<Channel>>();
+        // };
+        let db = Database::init(&config).await?;
+
+        Ok(Self {
+            config,
+            db,
             running: true,
             feeds: StatefulList::<Channel>::with_items(items),
             items: StatefulList::<Item>::default(),
             active_view: ActiveView::Feeds,
-        }
-    }
-}
-
-impl App {
-    pub fn new() -> Self {
-        Self::default()
+        })
     }
 
     /// Handles the tick event of the terminal.

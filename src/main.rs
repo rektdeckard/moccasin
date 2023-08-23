@@ -1,4 +1,4 @@
-use std::{io, process};
+use std::io;
 use tabss::app::{App, AppResult};
 use tabss::event::{Event, EventHandler};
 use tabss::handler::handle_key_events;
@@ -6,17 +6,13 @@ use tabss::tui::Tui;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
 
-fn main() -> AppResult<()> {
-    // Create an application.
-    let mut app = App::new();
+#[tokio::main]
+async fn main() -> AppResult<()> {
+    // Read or create config
+    let config = tabss::config::Config::read_from_path(None)?;
 
-    // unsafe {
-    //     println!(
-    //         "{:?}",
-    //         app.feeds.items().get_unchecked(0).items().get_unchecked(0)
-    //     );
-    //     process::exit(0);
-    // }
+    // Create an application.
+    let mut app = App::init(config).await?;
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stderr());

@@ -3,7 +3,7 @@ use tui::{
     layout::Alignment,
     prelude::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
+    widgets::{Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Wrap},
     Frame,
 };
 
@@ -31,11 +31,12 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         .title("Feeds")
         .title_alignment(Alignment::Center)
         .title_style(Style::default().bg(Color::White).fg(Color::Red))
+        .padding(Padding::uniform(1))
         .borders(Borders::ALL)
         .border_style(if app.active_view == ActiveView::Feeds {
-            Style::default().fg(Color::LightBlue)
+            app.config.theme().active_panel()
         } else {
-            Style::default()
+            app.config.theme().inactive_panel()
         })
         .border_type(BorderType::Plain);
 
@@ -47,7 +48,12 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             .collect::<Vec<_>>(),
     )
     .block(left)
-    .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+    .style(app.config.theme().base())
+    .highlight_style(if app.active_view == ActiveView::Feeds {
+        app.config.theme().active_selection()
+    } else {
+        app.config.theme().inactive_selection()
+    });
 
     let current_feed = app
         .feeds
@@ -59,11 +65,12 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         let block = Block::default()
             .title(channel.title())
             .title_alignment(Alignment::Center)
+            .padding(Padding::uniform(1))
             .borders(Borders::ALL)
             .border_style(if app.active_view == ActiveView::Items {
-                Style::default().fg(Color::LightBlue)
+                app.config.theme().active_panel()
             } else {
-                Style::default()
+                app.config.theme().inactive_panel()
             })
             .border_type(BorderType::Plain);
 
@@ -78,7 +85,12 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                 .collect::<Vec<_>>(),
         )
         .block(block)
-        .highlight_style(Style::default().add_modifier(Modifier::REVERSED));
+        .style(app.config.theme().base())
+        .highlight_style(if app.active_view == ActiveView::Items {
+            app.config.theme().active_selection()
+        } else {
+            app.config.theme().inactive_selection()
+        });
 
         frame.render_stateful_widget(items_list, chunks[1], &mut app.items.state);
 
@@ -86,16 +98,18 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             let block = Block::default()
                 .title("Detail")
                 .title_alignment(Alignment::Center)
+                .padding(Padding::uniform(1))
+                .style(app.config.theme().base())
                 .borders(Borders::ALL)
                 .border_style(if app.active_view == ActiveView::Detail {
-                    Style::default().fg(Color::LightBlue)
+                    app.config.theme().active_panel()
                 } else {
-                    Style::default()
-                })
-                .border_type(BorderType::Plain);
+                    app.config.theme().inactive_panel()
+                });
             let detail = Paragraph::new(detail.description().unwrap_or("EMPTY"))
                 .wrap(Wrap { trim: true })
                 .block(block);
+
             frame.render_widget(detail, chunks[2]);
         }
     } else {
@@ -104,7 +118,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                 .title("Items")
                 .title_alignment(Alignment::Center)
                 .borders(Borders::ALL)
-                .border_type(BorderType::Plain),
+                .style(app.config.theme().base()),
             chunks[1],
         );
     }
