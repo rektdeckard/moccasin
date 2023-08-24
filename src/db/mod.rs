@@ -20,7 +20,7 @@ impl Debug for Database {
 
 impl Database {
     pub async fn init(config: &TabssConfig) -> Result<Self> {
-        let path = Path::new(&config.config_path()).join("../tabss.db");
+        let path = Path::new(&config.config_path()).join("tabss.db");
         let storage =
             SledStorage::new(path.to_str().expect("could not serialize config path")).unwrap();
         let mut storage = Glue::new(storage);

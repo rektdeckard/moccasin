@@ -2,6 +2,7 @@ use crate::{config::Config, db::Database};
 use anyhow::Result;
 use rss::{Channel, Item};
 use std::error;
+use std::process::{Child, Command, Stdio};
 use tui::widgets::ListState;
 
 /// Application result type.
@@ -133,6 +134,42 @@ impl App {
         match self.active_view {
             ActiveView::Feeds => self.prev_feed(),
             ActiveView::Items => self.prev_item(),
+            _ => {}
+        }
+    }
+
+    fn open_link(link: &str) -> Option<Child> {
+        let null = Stdio::null();
+        if cfg!(target_os = "windows") {
+            Command::new("start")
+                .args(["", link])
+                .stdout(null)
+                .spawn()
+                .ok()
+        } else if cfg!(target_os = "macos") {
+            Command::new("open").arg(link).stdout(null).spawn().ok()
+        } else if cfg!(target_os = "linux") {
+            Command::new("xdg-open").arg(link).stdout(null).spawn().ok()
+        } else {
+            None
+        }
+    }
+
+    pub fn enter(&mut self) {
+        match self.active_view {
+            ActiveView::Feeds => {
+                if let Some(feed) = self.current_feed() {
+                    let link = feed.link();
+                    let _ = App::open_link(link);
+                }
+            }
+            ActiveView::Items => {
+                if let Some(item) = self.current_item() {
+                    if let Some(link) = item.link() {
+                        let _ = App::open_link(link);
+                    }
+                }
+            }
             _ => {}
         }
     }

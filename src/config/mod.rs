@@ -2,8 +2,8 @@ use anyhow::Result;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
-use std::{collections::HashMap, fs, fs::File, path::Path};
-use toml::{Table, Value};
+use std::{collections::HashMap, fs, fs::File, io::Write, path::Path};
+use toml::{toml, Table, Value};
 
 mod theme;
 
@@ -11,21 +11,21 @@ const CONFIG_FILE_VARIANTS: [&'static str; 3] = ["tabss.toml", "tabss.yaml", "ta
 
 #[derive(Debug, Clone)]
 enum ConfigVariant {
-    Toml(String),
-    Yaml(String),
+    Toml(String, String),
+    Yaml(String, String),
 }
 
 impl Default for ConfigVariant {
     fn default() -> Self {
-        let path = ProjectDirs::from("com", "rektsoft", "tabss")
-            .unwrap()
-            .config_dir()
+        let cfg_path = ProjectDirs::from("com", "rektsoft", "tabss").unwrap();
+        let cfg_path = cfg_path.config_dir();
+        let cfg_file = cfg_path
             .join(CONFIG_FILE_VARIANTS[0])
             .as_path()
             .to_str()
             .unwrap()
             .to_owned();
-        ConfigVariant::Toml(path)
+        ConfigVariant::Toml(cfg_path.to_str().unwrap().to_owned(), cfg_file)
     }
 }
 
@@ -39,8 +39,8 @@ pub struct Config {
 impl Config {
     pub fn config_path(&self) -> String {
         match &self.variant {
-            ConfigVariant::Toml(s) => s.clone(),
-            ConfigVariant::Yaml(s) => s.clone(),
+            ConfigVariant::Toml(s, _) => s.clone(),
+            ConfigVariant::Yaml(s, _) => s.clone(),
         }
     }
 
@@ -57,9 +57,15 @@ impl Config {
             let path = base_path.join(v);
             if path.exists() {
                 if i == 0 {
-                    return Some(ConfigVariant::Toml(path.to_str().unwrap().to_owned()));
+                    return Some(ConfigVariant::Toml(
+                        base_path.to_str().unwrap().to_owned(),
+                        path.to_str().unwrap().to_owned(),
+                    ));
                 } else {
-                    return Some(ConfigVariant::Yaml(path.to_str().unwrap().to_owned()));
+                    return Some(ConfigVariant::Yaml(
+                        base_path.to_str().unwrap().to_owned(),
+                        path.to_str().unwrap().to_owned(),
+                    ));
                 }
             }
         }
@@ -74,10 +80,10 @@ impl Config {
         if let Some(variant) = Config::find_config_file(cfg_dir) {
             // let theme = fs::read_to_string(cfg_dir.join("themes/Chalk.light.yml"))?;
             // let color_scheme = colorscheme::ColorScheme::from_yaml(&theme)?;
-            let color_scheme = theme::Theme::jungle();
+            let color_scheme = theme::Theme::default();
 
             match &variant {
-                ConfigVariant::Toml(cfg_path) => {
+                ConfigVariant::Toml(_, cfg_path) => {
                     let toml = fs::read_to_string(&cfg_path)?;
                     let table = toml.parse::<Table>()?;
                     let feeds: Vec<String> = match table.get("data") {
@@ -100,7 +106,7 @@ impl Config {
                         theme: color_scheme,
                     })
                 }
-                ConfigVariant::Yaml(cfg_path) => {
+                ConfigVariant::Yaml(_, cfg_path) => {
                     #[derive(Debug, PartialEq, Serialize, Deserialize)]
                     struct Yaml {
                         data: HashMap<String, Vec<String>>,
@@ -121,10 +127,18 @@ impl Config {
         } else {
             fs::create_dir_all(cfg_dir)?;
             let cfg_path = Path::new(cfg_dir).join(CONFIG_FILE_VARIANTS[0]);
-            let _ = File::create(&cfg_path)?;
+            let mut file = File::create(&cfg_path)?;
+            let stub = toml! {
+                [data]
+                feeds = []
+            };
+            file.write(toml::to_string_pretty(&stub).unwrap().as_bytes())?;
 
             Ok(Self {
-                variant: ConfigVariant::Toml(cfg_path.to_str().unwrap().to_owned()),
+                variant: ConfigVariant::Toml(
+                    cfg_dir.to_str().unwrap().to_owned(),
+                    cfg_path.to_str().unwrap().to_owned(),
+                ),
                 ..Default::default()
             })
         }

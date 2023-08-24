@@ -96,6 +96,16 @@ impl Theme {
             inactive_panel: Some(Style::default().dim()),
         }
     }
+
+    pub fn redshift() -> Self {
+        Self {
+            base: Style::default().red(),
+            active_selection: Some(Style::default().red().reversed()),
+            active_panel: Some(Style::default().red()),
+            inactive_selection: Some(Style::default().dim().reversed()),
+            inactive_panel: Some(Style::default().dim()),
+        }
+    }
 }
 
 impl Default for Theme {

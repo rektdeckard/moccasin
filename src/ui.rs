@@ -29,7 +29,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
 
     let left = Block::default()
         .title("Feeds")
-        .title_alignment(Alignment::Center)
+        .title_alignment(Alignment::Left)
         .title_style(Style::default().bg(Color::White).fg(Color::Red))
         .padding(Padding::uniform(1))
         .borders(Borders::ALL)
@@ -64,7 +64,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
     if let Some(channel) = current_feed {
         let block = Block::default()
             .title(channel.title())
-            .title_alignment(Alignment::Center)
+            .title_alignment(Alignment::Left)
             .padding(Padding::uniform(1))
             .borders(Borders::ALL)
             .border_style(if app.active_view == ActiveView::Items {
@@ -97,7 +97,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         if let Some(detail) = app.current_item() {
             let block = Block::default()
                 .title("Detail")
-                .title_alignment(Alignment::Center)
+                .title_alignment(Alignment::Left)
                 .padding(Padding::uniform(1))
                 .style(app.config.theme().base())
                 .borders(Borders::ALL)
@@ -116,7 +116,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         frame.render_widget(
             Block::default()
                 .title("Items")
-                .title_alignment(Alignment::Center)
+                .title_alignment(Alignment::Left)
                 .borders(Borders::ALL)
                 .style(app.config.theme().base()),
             chunks[1],

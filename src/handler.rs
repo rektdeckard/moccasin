@@ -34,6 +34,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             app.prev_view();
         }
         // Other handlers you could add here.
+        KeyCode::Enter => {
+            app.enter();
+        }
         _ => {}
     }
     Ok(())
