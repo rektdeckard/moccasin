@@ -1,7 +1,8 @@
+use crossterm::terminal;
 use std::io;
 use tabss::app::{App, AppResult};
 use tabss::event::{Event, EventHandler};
-use tabss::handler::{handle_key_events, handle_mouse_events};
+use tabss::handler::{handle_key_events, handle_mouse_events, handle_resize_events};
 use tabss::tui::Tui;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
@@ -12,7 +13,7 @@ async fn main() -> AppResult<()> {
     let config = tabss::config::Config::read_from_path(None)?;
 
     // Create an application.
-    let mut app = App::init(config).await?;
+    let mut app = App::init(terminal::size().unwrap(), config).await?;
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stderr());
@@ -30,7 +31,7 @@ async fn main() -> AppResult<()> {
             Event::Tick => app.tick(),
             Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
             Event::Mouse(mouse_event) => handle_mouse_events(mouse_event, &mut app)?,
-            Event::Resize(_, _) => {}
+            Event::Resize(w, h) => handle_resize_events((w, h), &mut app)?,
         }
     }
 

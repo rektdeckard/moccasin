@@ -5,10 +5,11 @@ use crossterm::event::{
 
 /// Handles the key events and updates the state of [`App`].
 pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
-    #[cfg(windows)]
-    match key_event.kind {
-        KeyEventKind::Press => {}
-        _ => return Ok(()),
+    if cfg!(target_os = "windows") {
+        match key_event.kind {
+            KeyEventKind::Press => {}
+            _ => return Ok(()),
+        }
     }
 
     match key_event.code {
@@ -60,5 +61,10 @@ pub fn handle_mouse_events(mouse_event: MouseEvent, app: &mut App) -> AppResult<
         }
         _ => {}
     }
+    Ok(())
+}
+
+pub fn handle_resize_events(dimensions: (u16, u16), app: &mut App) -> AppResult<()> {
+    app.set_dimensions(dimensions);
     Ok(())
 }

@@ -1,15 +1,14 @@
+use crate::app::{ActiveView, App};
 use tui::{
     backend::Backend,
     layout::Alignment,
-    prelude::{Constraint, Direction, Layout},
+    prelude::{Constraint, Direction, Layout, Margin},
     style::{Color, Modifier, Style},
     widgets::{
         scrollbar, Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Scrollbar, Wrap,
     },
     Frame,
 };
-
-use crate::app::{ActiveView, App};
 
 /// Renders the user interface widgets.
 pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
@@ -33,7 +32,16 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         .title("Feeds")
         .title_alignment(Alignment::Left)
         .title_style(Style::default().bg(Color::White).fg(Color::Red))
-        .padding(Padding::uniform(1))
+        .padding(if app.should_render_feeds_scroll() {
+            Padding {
+                top: 1,
+                bottom: 1,
+                left: 1,
+                right: 2,
+            }
+        } else {
+            Padding::uniform(1)
+        })
         .borders(Borders::ALL)
         .border_style(if app.active_view == ActiveView::Feeds {
             app.config.theme().active_border()
@@ -67,7 +75,16 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         let block = Block::default()
             .title(channel.title())
             .title_alignment(Alignment::Left)
-            .padding(Padding::uniform(1))
+            .padding(if app.should_render_items_scroll() {
+                Padding {
+                    top: 1,
+                    bottom: 1,
+                    left: 1,
+                    right: 2,
+                }
+            } else {
+                Padding::uniform(1)
+            })
             .borders(Borders::ALL)
             .border_style(if app.active_view == ActiveView::Items {
                 app.config.theme().active_border()
@@ -95,6 +112,20 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         });
 
         frame.render_stateful_widget(items_list, chunks[1], &mut app.items.state);
+        if app.should_render_items_scroll() {
+            frame.render_stateful_widget(
+                Scrollbar::default()
+                    .begin_symbol(None)
+                    .end_symbol(None)
+                    .track_symbol(scrollbar::VERTICAL.thumb)
+                    .track_style(Style::default().add_modifier(Modifier::DIM)),
+                chunks[1].inner(&Margin {
+                    vertical: 1,
+                    horizontal: 1,
+                }),
+                &mut app.items_scroll,
+            );
+        }
 
         let block = Block::default()
             .title("Detail")
@@ -202,4 +233,18 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
     }
 
     frame.render_stateful_widget(feeds_list, chunks[0], &mut app.feeds.state);
+    if app.should_render_feeds_scroll() {
+        frame.render_stateful_widget(
+            Scrollbar::default()
+                .begin_symbol(None)
+                .end_symbol(None)
+                .track_symbol(scrollbar::VERTICAL.thumb)
+                .track_style(Style::default().add_modifier(Modifier::DIM)),
+            chunks[0].inner(&Margin {
+                vertical: 1,
+                horizontal: 1,
+            }),
+            &mut app.feeds_scroll,
+        );
+    }
 }

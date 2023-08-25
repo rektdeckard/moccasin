@@ -3,7 +3,7 @@ use anyhow::Result;
 use rss::{Channel, Item};
 use std::error;
 use std::process::{Child, Command, Stdio};
-use tui::widgets::{ListState, ScrollDirection, ScrollbarState};
+use tui::widgets::{ListState, ScrollbarState};
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -14,16 +14,20 @@ pub struct App {
     pub config: Config,
     pub db: Database,
     pub running: bool,
-    pub feeds: StatefulList<Channel>,
-    pub items: StatefulList<Item>,
     pub active_view: ActiveView,
+    pub feeds: StatefulList<Channel>,
+    pub feeds_scroll: ScrollbarState,
+    pub items: StatefulList<Item>,
+    pub items_scroll: ScrollbarState,
     pub detail_scroll: ScrollbarState,
     pub detail_scroll_index: u16,
+    dimensions: (u16, u16),
 }
 
 impl App {
-    pub async fn init(config: Config) -> Result<Self> {
+    pub async fn init(dimensions: (u16, u16), config: Config) -> Result<Self> {
         let urls = config.feed_urls();
+        let feeds_count = urls.len() as u16;
         let mut items: Vec<Channel> = Vec::with_capacity(urls.len());
 
         for url in urls {
@@ -39,9 +43,12 @@ impl App {
             config,
             db,
             running: true,
-            feeds: StatefulList::<Channel>::with_items(items),
-            items: StatefulList::<Item>::default(),
+            dimensions,
             active_view: ActiveView::Feeds,
+            feeds: StatefulList::<Channel>::with_items(items),
+            feeds_scroll: ScrollbarState::default().content_length(feeds_count),
+            items: StatefulList::<Item>::default(),
+            items_scroll: ScrollbarState::default(),
             detail_scroll: ScrollbarState::default(),
             detail_scroll_index: 0,
         })
@@ -53,6 +60,18 @@ impl App {
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
         self.running = false;
+    }
+
+    pub fn set_dimensions(&mut self, dimensions: (u16, u16)) {
+        self.dimensions = dimensions;
+    }
+
+    pub fn should_render_feeds_scroll(&self) -> bool {
+        self.feeds.items().len() as u16 > self.dimensions.1 - 4
+    }
+
+    pub fn should_render_items_scroll(&self) -> bool {
+        self.items.items().len() as u16 > self.dimensions.1 - 4
     }
 
     pub fn current_feed(&self) -> Option<&Channel> {
@@ -70,29 +89,57 @@ impl App {
     }
 
     pub fn next_feed(&mut self) {
-        self.items.state.select(Some(0));
         self.feeds.next();
+        self.feeds_scroll = self.feeds_scroll.position(
+            self.feeds
+                .state
+                .selected()
+                .unwrap_or(self.feeds.state.offset()) as u16,
+        );
 
         if let Some(channel) = self.current_feed() {
             self.items.items = channel.items().into();
+            self.items_scroll = self
+                .items_scroll
+                .content_length(self.items.items.len() as u16);
         }
     }
 
     pub fn prev_feed(&mut self) {
-        self.items.state.select(Some(0));
         self.feeds.previous();
+        self.feeds_scroll = self.feeds_scroll.position(
+            self.feeds
+                .state
+                .selected()
+                .unwrap_or(self.feeds.state.offset()) as u16,
+        );
 
         if let Some(channel) = self.current_feed() {
             self.items.items = channel.items().into();
+            self.items_scroll = self
+                .items_scroll
+                .content_length(self.items.items.len() as u16);
         }
     }
 
     pub fn next_item(&mut self) {
         self.items.next();
+        self.items_scroll = self.items_scroll.position(
+            self.items
+                .state
+                .selected()
+                .unwrap_or(self.items.state.offset()) as u16,
+        );
     }
 
     pub fn prev_item(&mut self) {
         self.items.previous();
+        self.items_scroll = self.items_scroll.position(
+            self.items
+                .state
+                .selected()
+                .unwrap_or(self.items.state.offset()) as u16,
+        );
     }
 
     pub fn next_view(&mut self) {
@@ -118,6 +165,8 @@ impl App {
     pub fn next(&mut self) {
         match self.active_view {
             ActiveView::Feeds => {
+                self.reset_items_scroll();
+                self.reset_detail_scroll();
                 self.next_feed();
             }
             ActiveView::Items => {
@@ -134,6 +183,7 @@ impl App {
     pub fn prev(&mut self) {
         match self.active_view {
             ActiveView::Feeds => {
+                self.reset_items_scroll();
                 self.reset_detail_scroll();
                 self.prev_feed();
             }
@@ -165,6 +215,11 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn reset_items_scroll(&mut self) {
+        self.items.state.select(Some(0));
+        self.items_scroll = self.items_scroll.position(0);
     }
 
     fn reset_detail_scroll(&mut self) {
@@ -247,6 +302,7 @@ impl<T> StatefulList<T> {
         self.state.select(Some(i));
     }
 
+    #[allow(dead_code)]
     fn unselect(&mut self) {
         self.state.select(None);
     }
