@@ -3,7 +3,7 @@ use anyhow::Result;
 use rss::{Channel, Item};
 use std::error;
 use std::process::{Child, Command, Stdio};
-use tui::widgets::ListState;
+use tui::widgets::{ListState, ScrollDirection, ScrollbarState};
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -17,6 +17,8 @@ pub struct App {
     pub feeds: StatefulList<Channel>,
     pub items: StatefulList<Item>,
     pub active_view: ActiveView,
+    pub detail_scroll: ScrollbarState,
+    pub detail_scroll_index: u16,
 }
 
 impl App {
@@ -31,17 +33,6 @@ impl App {
             }
         }
 
-        // async {
-        //     let items = config
-        //         .feed_urls()
-        //         .iter()
-        //         .filter_map(|url| {
-        //             let res = reqwest::get(url).await?;
-        //             let res = res.bytes().unwrap();
-        //             Channel::read_from(&res[..]).ok()
-        //         })
-        //         .collect::<Vec<Channel>>();
-        // };
         let db = Database::init(&config).await?;
 
         Ok(Self {
@@ -51,6 +42,8 @@ impl App {
             feeds: StatefulList::<Channel>::with_items(items),
             items: StatefulList::<Item>::default(),
             active_view: ActiveView::Feeds,
+            detail_scroll: ScrollbarState::default(),
+            detail_scroll_index: 0,
         })
     }
 
@@ -122,36 +115,36 @@ impl App {
         }
     }
 
-    pub fn next_element(&mut self) {
+    pub fn next(&mut self) {
         match self.active_view {
-            ActiveView::Feeds => self.next_feed(),
-            ActiveView::Items => self.next_item(),
-            _ => {}
+            ActiveView::Feeds => {
+                self.next_feed();
+            }
+            ActiveView::Items => {
+                self.reset_detail_scroll();
+                self.next_item();
+            }
+            ActiveView::Detail => {
+                self.detail_scroll_index = self.detail_scroll_index.saturating_add(1);
+                self.detail_scroll.next();
+            }
         }
     }
 
-    pub fn prev_element(&mut self) {
+    pub fn prev(&mut self) {
         match self.active_view {
-            ActiveView::Feeds => self.prev_feed(),
-            ActiveView::Items => self.prev_item(),
-            _ => {}
-        }
-    }
-
-    fn open_link(link: &str) -> Option<Child> {
-        let null = Stdio::null();
-        if cfg!(target_os = "windows") {
-            Command::new("start")
-                .args(["", link])
-                .stdout(null)
-                .spawn()
-                .ok()
-        } else if cfg!(target_os = "macos") {
-            Command::new("open").arg(link).stdout(null).spawn().ok()
-        } else if cfg!(target_os = "linux") {
-            Command::new("xdg-open").arg(link).stdout(null).spawn().ok()
-        } else {
-            None
+            ActiveView::Feeds => {
+                self.reset_detail_scroll();
+                self.prev_feed();
+            }
+            ActiveView::Items => {
+                self.reset_detail_scroll();
+                self.prev_item();
+            }
+            ActiveView::Detail => {
+                self.detail_scroll_index = self.detail_scroll_index.saturating_sub(1);
+                self.detail_scroll.prev();
+            }
         }
     }
 
@@ -171,6 +164,28 @@ impl App {
                 }
             }
             _ => {}
+        }
+    }
+
+    fn reset_detail_scroll(&mut self) {
+        self.detail_scroll_index = 0;
+        self.detail_scroll = self.detail_scroll.position(0);
+    }
+
+    fn open_link(link: &str) -> Option<Child> {
+        let null = Stdio::null();
+        if cfg!(target_os = "windows") {
+            Command::new("rundll32")
+                .args(["url.dll,FileProtocolHandler", link])
+                .stdout(null)
+                .spawn()
+                .ok()
+        } else if cfg!(target_os = "macos") {
+            Command::new("open").arg(link).stdout(null).spawn().ok()
+        } else if cfg!(target_os = "linux") {
+            Command::new("xdg-open").arg(link).stdout(null).spawn().ok()
+        } else {
+            None
         }
     }
 }

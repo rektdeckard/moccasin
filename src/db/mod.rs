@@ -6,7 +6,6 @@ use gluesql::{
     sled_storage::SledStorage,
 };
 use std::fmt::Debug;
-use std::path::Path;
 
 pub struct Database {
     pub storage: Glue<SledStorage>,
@@ -20,7 +19,7 @@ impl Debug for Database {
 
 impl Database {
     pub async fn init(config: &TabssConfig) -> Result<Self> {
-        let path = Path::new(&config.config_path()).join("tabss.db");
+        let path = config.db_path();
         let storage =
             SledStorage::new(path.to_str().expect("could not serialize config path")).unwrap();
         let mut storage = Glue::new(storage);

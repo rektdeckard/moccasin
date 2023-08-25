@@ -2,7 +2,13 @@ use anyhow::Result;
 use directories::ProjectDirs;
 use serde::{Deserialize, Serialize};
 use serde_yaml;
-use std::{collections::HashMap, fs, fs::File, io::Write, path::Path};
+use std::{
+    collections::HashMap,
+    fs,
+    fs::File,
+    io::Write,
+    path::{Path, PathBuf},
+};
 use toml::{toml, Table, Value};
 
 mod theme;
@@ -37,11 +43,16 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn config_path(&self) -> String {
-        match &self.variant {
-            ConfigVariant::Toml(s, _) => s.clone(),
-            ConfigVariant::Yaml(s, _) => s.clone(),
-        }
+    pub fn config_path(&self) -> PathBuf {
+        Path::new(match &self.variant {
+            ConfigVariant::Toml(s, _) => s,
+            ConfigVariant::Yaml(s, _) => s,
+        })
+        .to_owned()
+    }
+
+    pub fn db_path(&self) -> PathBuf {
+        self.config_path().join("db")
     }
 
     pub fn theme(&self) -> &theme::Theme {
@@ -80,25 +91,39 @@ impl Config {
         if let Some(variant) = Config::find_config_file(cfg_dir) {
             // let theme = fs::read_to_string(cfg_dir.join("themes/Chalk.light.yml"))?;
             // let color_scheme = colorscheme::ColorScheme::from_yaml(&theme)?;
-            let color_scheme = theme::Theme::default();
+            let color_scheme = theme::Theme::jungle();
 
             match &variant {
                 ConfigVariant::Toml(_, cfg_path) => {
                     let toml = fs::read_to_string(&cfg_path)?;
                     let table = toml.parse::<Table>()?;
-                    let feeds: Vec<String> = match table.get("data") {
-                        Some(Value::Table(data)) => match data.get("feeds") {
+                    let feeds: Vec<String> = match table.get("sources") {
+                        Some(Value::Table(sources)) => match sources.get("feeds") {
                             Some(Value::Array(els)) => els
                                 .iter()
                                 .filter_map(|v| v.as_str().and_then(|v| Some(v.to_owned())))
                                 .collect(),
                             Some(_) => {
-                                panic!("unexpected config.toml value for 'data.feeds'")
+                                panic!("unexpected config entry for [sources].feeds")
                             }
                             _ => vec![],
                         },
-                        _ => panic!("unexpected config.toml value for [data]"),
+                        _ => panic!("unexpected config entry for [sources]"),
                     };
+
+                    let preferences = match table.get("preferences") {
+                        Some(Value::Table(prefs)) => Some(prefs),
+                        Some(_) => panic!("invalid config entry for [preferences]"),
+                        None => None,
+                    };
+
+                    let color_scheme = preferences
+                        .and_then(|prefs| {
+                            prefs
+                                .get("color_scheme")
+                                .and_then(|scheme| theme::Theme::try_from(scheme).ok())
+                        })
+                        .unwrap_or_default();
 
                     Ok(Self {
                         variant: variant.clone(),

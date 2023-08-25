@@ -35,7 +35,7 @@ impl EventHandler {
         let tick_rate = Duration::from_millis(tick_rate);
         let (sender, receiver) = mpsc::channel();
         let handler = {
-            let sender = sender.clone();
+            let sender: mpsc::Sender<Event> = sender.clone();
             thread::spawn(move || {
                 let mut last_tick = Instant::now();
                 loop {

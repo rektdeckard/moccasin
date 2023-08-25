@@ -1,7 +1,7 @@
 use std::io;
 use tabss::app::{App, AppResult};
 use tabss::event::{Event, EventHandler};
-use tabss::handler::handle_key_events;
+use tabss::handler::{handle_key_events, handle_mouse_events};
 use tabss::tui::Tui;
 use tui::backend::CrosstermBackend;
 use tui::Terminal;
@@ -29,7 +29,7 @@ async fn main() -> AppResult<()> {
         match tui.events.next()? {
             Event::Tick => app.tick(),
             Event::Key(key_event) => handle_key_events(key_event, &mut app)?,
-            Event::Mouse(_) => {}
+            Event::Mouse(mouse_event) => handle_mouse_events(mouse_event, &mut app)?,
             Event::Resize(_, _) => {}
         }
     }
