@@ -1,9 +1,28 @@
-use crate::{config::Config, db::Database};
+use crate::config::Config;
+use crate::db::{Database, StorageEvent};
 use anyhow::Result;
+use clap::Parser;
 use rss::{Channel, Item};
 use std::error;
 use std::process::{Child, Command, Stdio};
+use tokio::sync::mpsc::{self, UnboundedReceiver};
 use tui::widgets::{ListState, ScrollbarState};
+
+#[derive(Parser, Debug)]
+#[command(author, version, about, long_about = None)]
+pub struct Args {
+    /// Sets a custom config file
+    #[arg(short, long)]
+    pub config: Option<String>,
+
+    /// Sets a custom theme, either built-in or a path to a theme file
+    #[arg(short, long)]
+    pub theme: Option<String>,
+
+    /// Sets a custom refresh rate in seconds
+    #[arg(short, long)]
+    pub interval: Option<u64>,
+}
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
@@ -22,6 +41,7 @@ pub struct App {
     pub detail_scroll: ScrollbarState,
     pub detail_scroll_index: u16,
     dimensions: (u16, u16),
+    rx: UnboundedReceiver<StorageEvent>,
 }
 
 impl App {
@@ -37,7 +57,8 @@ impl App {
             }
         }
 
-        let db = Database::init(&config).await?;
+        let (tx, rx) = mpsc::unbounded_channel::<StorageEvent>();
+        let db = Database::init(&config, tx).await?;
 
         Ok(Self {
             config,
@@ -51,6 +72,7 @@ impl App {
             items_scroll: ScrollbarState::default(),
             detail_scroll: ScrollbarState::default(),
             detail_scroll_index: 0,
+            rx,
         })
     }
 
@@ -72,6 +94,10 @@ impl App {
 
     pub fn should_render_items_scroll(&self) -> bool {
         self.items.items().len() as u16 > self.dimensions.1 - 4
+    }
+
+    pub fn should_render_detail_scroll(&self) -> bool {
+        false
     }
 
     pub fn current_feed(&self) -> Option<&Channel> {
@@ -215,6 +241,18 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    pub fn open_config(&self) -> Option<Child> {
+        if let Some(cfg_path) = self.config.config_file_path().as_path().to_str() {
+            Self::open_link(cfg_path)
+        } else {
+            None
+        }
+    }
+
+    fn set_feeds(&mut self, feeds: Vec<Channel>) {
+        self.feeds = StatefulList::with_items(feeds)
     }
 
     fn reset_items_scroll(&mut self) {

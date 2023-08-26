@@ -3,7 +3,7 @@ use tui::{
     backend::Backend,
     layout::Alignment,
     prelude::{Constraint, Direction, Layout, Margin},
-    style::{Color, Modifier, Style},
+    style::{Color, Modifier, Style, Stylize},
     widgets::{
         scrollbar, Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Scrollbar, Wrap,
     },
@@ -118,7 +118,8 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                     .begin_symbol(None)
                     .end_symbol(None)
                     .track_symbol(scrollbar::VERTICAL.thumb)
-                    .track_style(Style::default().add_modifier(Modifier::DIM)),
+                    .track_style(app.config.theme().scrollbar_track())
+                    .thumb_style(app.config.theme().scrollbar_thumb()),
                 chunks[1].inner(&Margin {
                     vertical: 1,
                     horizontal: 1,
@@ -186,7 +187,11 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                     top: 0,
                     bottom: 0,
                     left: 1,
-                    right: 2,
+                    right: if app.should_render_detail_scroll() {
+                        2
+                    } else {
+                        1
+                    },
                 }))
                 .scroll((app.detail_scroll_index, 0));
 
@@ -203,15 +208,18 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             frame.render_widget(body, content_chunks[4]);
 
             app.detail_scroll = app.detail_scroll.content_length(48);
-            frame.render_stateful_widget(
-                Scrollbar::default()
-                    .begin_symbol(None)
-                    .end_symbol(None)
-                    .track_symbol(scrollbar::VERTICAL.thumb)
-                    .track_style(Style::default().add_modifier(Modifier::DIM)),
-                content_chunks[4],
-                &mut app.detail_scroll,
-            );
+            if app.should_render_detail_scroll() {
+                frame.render_stateful_widget(
+                    Scrollbar::default()
+                        .begin_symbol(None)
+                        .end_symbol(None)
+                        .track_symbol(scrollbar::VERTICAL.thumb)
+                        .track_style(app.config.theme().scrollbar_track())
+                        .thumb_style(app.config.theme().scrollbar_thumb()),
+                    content_chunks[4],
+                    &mut app.detail_scroll,
+                );
+            }
         }
     } else {
         frame.render_widget(
@@ -239,7 +247,8 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                 .begin_symbol(None)
                 .end_symbol(None)
                 .track_symbol(scrollbar::VERTICAL.thumb)
-                .track_style(Style::default().add_modifier(Modifier::DIM)),
+                .track_style(app.config.theme().scrollbar_track())
+                .thumb_style(app.config.theme().scrollbar_thumb()),
             chunks[0].inner(&Margin {
                 vertical: 1,
                 horizontal: 1,

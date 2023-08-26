@@ -33,9 +33,9 @@ impl EventHandler {
     /// Constructs a new instance of [`EventHandler`].
     pub fn new(tick_rate: u64) -> Self {
         let tick_rate = Duration::from_millis(tick_rate);
-        let (sender, receiver) = mpsc::channel();
+        let (sender, receiver) = mpsc::channel::<Event>();
         let handler = {
-            let sender: mpsc::Sender<Event> = sender.clone();
+            let sender = sender.clone();
             thread::spawn(move || {
                 let mut last_tick = Instant::now();
                 loop {

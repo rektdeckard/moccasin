@@ -1,6 +1,7 @@
+use clap::Parser;
 use crossterm::terminal;
 use std::io;
-use tabss::app::{App, AppResult};
+use tabss::app::{App, AppResult, Args};
 use tabss::event::{Event, EventHandler};
 use tabss::handler::{handle_key_events, handle_mouse_events, handle_resize_events};
 use tabss::tui::Tui;
@@ -9,8 +10,11 @@ use tui::Terminal;
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
+    // Parse arguments
+    let args = Args::parse();
+
     // Read or create config
-    let config = tabss::config::Config::read_from_path(None)?;
+    let config = tabss::config::Config::new(args)?;
 
     // Create an application.
     let mut app = App::init(terminal::size().unwrap(), config).await?;

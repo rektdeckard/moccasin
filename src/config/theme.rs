@@ -1,8 +1,7 @@
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::error::Error;
 use std::fmt;
-use toml::{toml, Table, Value};
+use toml::Value;
 use tui::style::{Color, Modifier, Style, Stylize};
 
 #[derive(Debug)]
@@ -47,22 +46,15 @@ fn make_color(c: &str) -> Color {
 pub struct Theme {
     base: Style,
     selection: Option<Style>,
-    active_selection: Option<Style>,
+    selection_active: Option<Style>,
     border: Option<Style>,
-    active_border: Option<Style>,
+    border_active: Option<Style>,
+    scrollbar: Option<Style>,
 }
 
 impl Theme {
     pub fn base(&self) -> Style {
         self.base.clone()
-    }
-
-    pub fn active_selection(&self) -> Style {
-        if let Some(s) = self.active_selection {
-            s.to_owned()
-        } else {
-            self.base.clone().add_modifier(Modifier::REVERSED)
-        }
     }
 
     pub fn selection(&self) -> Style {
@@ -73,11 +65,11 @@ impl Theme {
         }
     }
 
-    pub fn active_border(&self) -> Style {
-        if let Some(s) = self.active_border {
+    pub fn active_selection(&self) -> Style {
+        if let Some(s) = self.selection_active {
             s.to_owned()
         } else {
-            self.base.clone()
+            self.base.clone().add_modifier(Modifier::REVERSED)
         }
     }
 
@@ -89,27 +81,36 @@ impl Theme {
         }
     }
 
-    pub fn from_yaml(s: &str) -> anyhow::Result<Self> {
-        let cs = serde_yaml::from_str::<ColorSchemeFile>(s)?;
+    pub fn active_border(&self) -> Style {
+        if let Some(s) = self.border_active {
+            s.to_owned()
+        } else {
+            self.base.clone()
+        }
+    }
 
-        let style = match cs.colors.primary {
-            Some(p) => {
-                let mut s = Style::default();
-                if let Some(fg) = p.foreground {
-                    s = s.fg(make_color(&fg));
-                }
-                if let Some(bg) = p.background {
-                    s = s.bg(make_color(&bg));
-                }
-                s
+    pub fn scrollbar_thumb(&self) -> Style {
+        if let Some(s) = self.scrollbar {
+            if let Some(fg) = s.fg {
+                Style::default().fg(fg)
+            } else {
+                Style::default()
             }
-            None => Default::default(),
-        };
+        } else {
+            Style::default()
+        }
+    }
 
-        Ok(Self {
-            base: style,
-            ..Default::default()
-        })
+    pub fn scrollbar_track(&self) -> Style {
+        if let Some(s) = self.scrollbar {
+            if let Some(bg) = s.bg.or(self.base.bg) {
+                Style::default().fg(bg)
+            } else {
+                Style::default().dim()
+            }
+        } else {
+            self.base().dim()
+        }
     }
 
     pub fn borland() -> Self {
@@ -121,19 +122,21 @@ impl Theme {
         Self {
             base: Style::default().fg(white).bg(midnight),
             border: Some(Style::default().fg(gray)),
-            active_border: Some(Style::default().fg(white)),
+            border_active: Some(Style::default().fg(white)),
             selection: Some(Style::default().fg(midnight).bg(gray)),
-            active_selection: Some(Style::default().fg(midnight).bg(yellow)),
+            selection_active: Some(Style::default().fg(midnight).bg(yellow)),
+            scrollbar: Some(Style::default().fg(white).bg(gray)),
         }
     }
 
     pub fn jungle() -> Self {
         Self {
             base: Default::default(),
-            active_selection: Some(Style::default().green().reversed()),
-            active_border: Some(Style::default().green()),
+            selection_active: Some(Style::default().green().reversed()),
+            border_active: Some(Style::default().green()),
             selection: Some(Style::default().dim().reversed()),
             border: Some(Style::default().dim()),
+            scrollbar: Some(Style::default().dim()),
         }
     }
 
@@ -145,19 +148,21 @@ impl Theme {
         Self {
             base: Style::default().fg(bright_green).bg(dark_green),
             border: Some(Style::default().fg(mid_green)),
-            active_border: Some(Style::default().fg(bright_green)),
+            border_active: Some(Style::default().fg(bright_green)),
             selection: Some(Style::default().fg(dark_green).bg(mid_green)),
-            active_selection: Some(Style::default().fg(dark_green).bg(bright_green)),
+            selection_active: Some(Style::default().fg(dark_green).bg(bright_green)),
+            scrollbar: Some(Style::default()),
         }
     }
 
     pub fn redshift() -> Self {
         Self {
-            base: Style::default().red(),
-            active_selection: Some(Style::default().red().reversed()),
-            active_border: Some(Style::default().red()),
+            base: Style::default().red().on_black(),
+            selection_active: Some(Style::default().red().reversed()),
+            border_active: Some(Style::default().red()),
             selection: Some(Style::default().dim().reversed()),
             border: Some(Style::default().dim()),
+            scrollbar: Some(Style::default().dim()),
         }
     }
 
@@ -169,9 +174,10 @@ impl Theme {
         Self {
             base: Style::default().fg(bright_amber).bg(black),
             border: Some(Style::default().fg(dark_amber)),
-            active_border: Some(Style::default().fg(bright_amber)),
+            border_active: Some(Style::default().fg(bright_amber)),
             selection: Some(Style::default().fg(black).bg(dark_amber)),
-            active_selection: Some(Style::default().fg(black).bg(bright_amber)),
+            selection_active: Some(Style::default().fg(black).bg(bright_amber)),
+            scrollbar: Some(Style::default()),
         }
     }
 }
@@ -180,10 +186,11 @@ impl Default for Theme {
     fn default() -> Self {
         Self {
             base: Style::default(),
-            active_selection: None,
+            selection_active: None,
             selection: None,
-            active_border: None,
+            border_active: None,
             border: None,
+            scrollbar: Some(Style::default().dim()),
         }
     }
 }
@@ -215,17 +222,20 @@ impl TryFrom<&toml::Value> for Theme {
                     .get("base")
                     .and_then(|v| try_style_from_toml(v).ok())
                     .unwrap_or_default(),
-                active_selection: scheme
-                    .get("active_selection")
+                selection_active: scheme
+                    .get("selection_active")
                     .and_then(|v| try_style_from_toml(v).ok()),
                 selection: scheme
                     .get("selection")
                     .and_then(|v| try_style_from_toml(v).ok()),
-                active_border: scheme
-                    .get("active_border")
-                    .and_then(|v| try_style_from_toml(v).ok()),
                 border: scheme
                     .get("border")
+                    .and_then(|v| try_style_from_toml(v).ok()),
+                border_active: scheme
+                    .get("border_active")
+                    .and_then(|v| try_style_from_toml(v).ok()),
+                scrollbar: scheme
+                    .get("scrollbar")
                     .and_then(|v| try_style_from_toml(v).ok()),
             }),
             _ => Err(ParseThemeError),

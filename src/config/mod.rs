@@ -1,58 +1,68 @@
+use crate::app::Args;
 use anyhow::Result;
 use directories::ProjectDirs;
-use serde::{Deserialize, Serialize};
-use serde_yaml;
-use std::{
-    collections::HashMap,
-    fs,
-    fs::File,
-    io::Write,
-    path::{Path, PathBuf},
-};
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::{fs, fs::File};
 use toml::{toml, Table, Value};
 
 mod theme;
 
-const CONFIG_FILE_VARIANTS: [&'static str; 3] = ["tabss.toml", "tabss.yaml", "tabss.yml"];
-
-#[derive(Debug, Clone)]
-enum ConfigVariant {
-    Toml(String, String),
-    Yaml(String, String),
-}
-
-impl Default for ConfigVariant {
-    fn default() -> Self {
-        let cfg_path = ProjectDirs::from("com", "rektsoft", "tabss").unwrap();
-        let cfg_path = cfg_path.config_dir();
-        let cfg_file = cfg_path
-            .join(CONFIG_FILE_VARIANTS[0])
-            .as_path()
-            .to_str()
-            .unwrap()
-            .to_owned();
-        ConfigVariant::Toml(cfg_path.to_str().unwrap().to_owned(), cfg_file)
-    }
-}
+const DEFAULT_CONFIG_FILE: &'static str = "tabss.toml";
+const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 
 #[derive(Debug, Default)]
 pub struct Config {
-    variant: ConfigVariant,
+    file_path: PathBuf,
+    dir_path: PathBuf,
     feed_urls: Vec<String>,
+    refresh_interval: u64,
     theme: theme::Theme,
 }
 
 impl Config {
-    pub fn config_path(&self) -> PathBuf {
-        Path::new(match &self.variant {
-            ConfigVariant::Toml(s, _) => s,
-            ConfigVariant::Yaml(s, _) => s,
-        })
-        .to_owned()
+    pub fn new(args: Args) -> Result<Self> {
+        let (dir_path, file_path): (PathBuf, PathBuf) = if let Some(path) = &args.config {
+            let file_path = Path::new(&path);
+            if !file_path.exists() {
+                panic!(
+                    "no config file found at '{}'",
+                    file_path.to_owned().to_str().unwrap()
+                )
+            }
+
+            let dir_path = file_path.parent().expect("could not find config directory");
+            (dir_path.into(), file_path.into())
+        } else {
+            let dir_path = ProjectDirs::from("com", "rektsoft", "tabss")
+                .unwrap()
+                .config_local_dir()
+                .to_owned();
+            let file_path = dir_path.join(DEFAULT_CONFIG_FILE).to_owned();
+            (dir_path, file_path)
+        };
+
+        if file_path.exists() {
+            Self::read_from_toml(args, dir_path, file_path)
+        } else {
+            Self::create_initialized(args, dir_path, file_path)
+        }
+    }
+
+    pub fn config_dir_path(&self) -> PathBuf {
+        Path::new(&self.dir_path).to_owned()
+    }
+
+    pub fn config_file_path(&self) -> PathBuf {
+        Path::new(&self.file_path).to_owned()
     }
 
     pub fn db_path(&self) -> PathBuf {
-        self.config_path().join("db")
+        self.config_dir_path().join("db")
+    }
+
+    pub fn themes_path(&self) -> PathBuf {
+        self.config_dir_path().join("themes")
     }
 
     pub fn theme(&self) -> &theme::Theme {
@@ -63,109 +73,72 @@ impl Config {
         &self.feed_urls
     }
 
-    fn find_config_file(base_path: &Path) -> Option<ConfigVariant> {
-        for (i, v) in CONFIG_FILE_VARIANTS.iter().enumerate() {
-            let path = base_path.join(v);
-            if path.exists() {
-                if i == 0 {
-                    return Some(ConfigVariant::Toml(
-                        base_path.to_str().unwrap().to_owned(),
-                        path.to_str().unwrap().to_owned(),
-                    ));
-                } else {
-                    return Some(ConfigVariant::Yaml(
-                        base_path.to_str().unwrap().to_owned(),
-                        path.to_str().unwrap().to_owned(),
-                    ));
-                }
-            }
-        }
-
-        None
+    pub fn refresh_interval(&self) -> u64 {
+        self.refresh_interval
     }
 
-    pub fn read_from_path(path: Option<&str>) -> Result<Self> {
-        let default_dir = ProjectDirs::from("com", "rektsoft", "tabss").unwrap();
-        let cfg_dir = path.map_or(default_dir.config_dir(), Path::new);
-
-        if let Some(variant) = Config::find_config_file(cfg_dir) {
-            // let theme = fs::read_to_string(cfg_dir.join("themes/Chalk.light.yml"))?;
-            // let color_scheme = colorscheme::ColorScheme::from_yaml(&theme)?;
-            let color_scheme = theme::Theme::jungle();
-
-            match &variant {
-                ConfigVariant::Toml(_, cfg_path) => {
-                    let toml = fs::read_to_string(&cfg_path)?;
-                    let table = toml.parse::<Table>()?;
-                    let feeds: Vec<String> = match table.get("sources") {
-                        Some(Value::Table(sources)) => match sources.get("feeds") {
-                            Some(Value::Array(els)) => els
-                                .iter()
-                                .filter_map(|v| v.as_str().and_then(|v| Some(v.to_owned())))
-                                .collect(),
-                            Some(_) => {
-                                panic!("unexpected config entry for [sources].feeds")
-                            }
-                            _ => vec![],
-                        },
-                        _ => panic!("unexpected config entry for [sources]"),
-                    };
-
-                    let preferences = match table.get("preferences") {
-                        Some(Value::Table(prefs)) => Some(prefs),
-                        Some(_) => panic!("invalid config entry for [preferences]"),
-                        None => None,
-                    };
-
-                    let color_scheme = preferences
-                        .and_then(|prefs| {
-                            prefs
-                                .get("color_scheme")
-                                .and_then(|scheme| theme::Theme::try_from(scheme).ok())
-                        })
-                        .unwrap_or_default();
-
-                    Ok(Self {
-                        variant: variant.clone(),
-                        feed_urls: feeds,
-                        theme: color_scheme,
-                    })
+    fn read_from_toml(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
+        let toml = fs::read_to_string(&file_path)?;
+        let table = toml.parse::<Table>()?;
+        let feeds: Vec<String> = match table.get("sources") {
+            Some(Value::Table(sources)) => match sources.get("feeds") {
+                Some(Value::Array(els)) => els
+                    .iter()
+                    .filter_map(|v| v.as_str().and_then(|v| Some(v.to_owned())))
+                    .collect(),
+                Some(_) => {
+                    panic!("unexpected config entry for [sources].feeds")
                 }
-                ConfigVariant::Yaml(_, cfg_path) => {
-                    #[derive(Debug, PartialEq, Serialize, Deserialize)]
-                    struct Yaml {
-                        data: HashMap<String, Vec<String>>,
-                    }
+                _ => vec![],
+            },
+            _ => panic!("unexpected config entry for [sources]"),
+        };
 
-                    let yaml = fs::read_to_string(&cfg_path)?;
-                    let table = serde_yaml::from_str::<Yaml>(&yaml)?;
-                    match table.data.get("feeds") {
-                        Some(feeds) => Ok(Self {
-                            variant: variant.clone(),
-                            feed_urls: feeds.clone(),
-                            theme: color_scheme,
-                        }),
-                        _ => panic!("unexpected config.toml value for 'data.feeds'"),
-                    }
-                }
-            }
-        } else {
-            fs::create_dir_all(cfg_dir)?;
-            let cfg_path = Path::new(cfg_dir).join(CONFIG_FILE_VARIANTS[0]);
-            let mut file = File::create(&cfg_path)?;
-            let stub = toml! {
-                [data]
-                feeds = []
-            };
-            file.write(toml::to_string_pretty(&stub).unwrap().as_bytes())?;
+        let preferences = match table.get("preferences") {
+            Some(Value::Table(prefs)) => Some(prefs),
+            Some(_) => panic!("invalid config entry for [preferences]"),
+            None => None,
+        };
 
-            Ok(Self {
-                variant: ConfigVariant::Toml(
-                    cfg_dir.to_str().unwrap().to_owned(),
-                    cfg_path.to_str().unwrap().to_owned(),
-                ),
-                ..Default::default()
+        // TODO: load from args if present
+        let theme = preferences
+            .and_then(|prefs| {
+                prefs
+                    .get("color_scheme")
+                    .and_then(|scheme| theme::Theme::try_from(scheme).ok())
             })
-        }
+            .unwrap_or_default();
+
+        Ok(Self {
+            file_path,
+            dir_path,
+            feed_urls: feeds,
+            refresh_interval: args.interval.unwrap_or(DEFAULT_REFRESH_INTERVAL),
+            theme,
+        })
+    }
+
+    fn create_initialized(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
+        fs::create_dir_all(&dir_path)?;
+        let cfg_path = Path::new(dir_path.as_path()).join(DEFAULT_CONFIG_FILE);
+        let mut file = File::create(&cfg_path)?;
+        let stub = toml! {
+            [sources]
+            feeds = []
+
+            [preferences]
+            color_scheme = "default"
+            refresh_interval = DEFAULT_REFRESH_INTERVAL
+        };
+        file.write(toml::to_string_pretty(&stub).unwrap().as_bytes())?;
+
+        // TODO: load theme from args if present
+
+        Ok(Self {
+            dir_path: dir_path.to_owned(),
+            file_path: file_path.to_owned(),
+            refresh_interval: args.interval.unwrap_or(DEFAULT_REFRESH_INTERVAL),
+            ..Default::default()
+        })
     }
 }

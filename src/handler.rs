@@ -40,6 +40,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Enter => {
             app.enter();
         }
+        KeyCode::Char(',') => {
+            app.open_config();
+        }
         _ => {}
     }
     Ok(())
