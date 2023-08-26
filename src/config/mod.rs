@@ -9,6 +9,7 @@ use toml::{toml, Table, Value};
 mod theme;
 
 const DEFAULT_CONFIG_FILE: &'static str = "tabss.toml";
+const DEFAULT_DB_FILE: &'static str = "tabss.db";
 const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 
 #[derive(Debug, Default)]
@@ -58,7 +59,7 @@ impl Config {
     }
 
     pub fn db_path(&self) -> PathBuf {
-        self.config_dir_path().join("db")
+        self.config_dir_path().join(DEFAULT_DB_FILE)
     }
 
     pub fn themes_path(&self) -> PathBuf {

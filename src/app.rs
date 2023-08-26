@@ -1,8 +1,8 @@
 use crate::config::Config;
-use crate::db::{Database, StorageEvent};
+use crate::db::{Repository, StorageEvent};
+use crate::feed::{Feed, Item};
 use anyhow::Result;
 use clap::Parser;
-use rss::{Channel, Item};
 use std::error;
 use std::process::{Child, Command, Stdio};
 use tokio::sync::mpsc::{self, UnboundedReceiver};
@@ -31,10 +31,10 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 #[derive(Debug)]
 pub struct App {
     pub config: Config,
-    pub db: Database,
+    pub db: Repository,
     pub running: bool,
     pub active_view: ActiveView,
-    pub feeds: StatefulList<Channel>,
+    pub feeds: StatefulList<Feed>,
     pub feeds_scroll: ScrollbarState,
     pub items: StatefulList<Item>,
     pub items_scroll: ScrollbarState,
@@ -48,17 +48,20 @@ impl App {
     pub async fn init(dimensions: (u16, u16), config: Config) -> Result<Self> {
         let urls = config.feed_urls();
         let feeds_count = urls.len() as u16;
-        let mut items: Vec<Channel> = Vec::with_capacity(urls.len());
 
-        for url in urls {
-            let res = reqwest::get(url).await?.bytes().await?;
-            if let Ok(channel) = Channel::read_from(&res[..]) {
-                items.push(channel);
-            }
-        }
+        let (tx, mut rx) = mpsc::unbounded_channel::<StorageEvent>();
+        let mut db = Repository::init(&config, tx).await?;
+        let items = db.fetch_all_by_url(urls)?;
+        // db.refresh_all_by_url(urls).await;
 
-        let (tx, rx) = mpsc::unbounded_channel::<StorageEvent>();
-        let db = Database::init(&config, tx).await?;
+        // let mut items: Vec<Feed> = Vec::with_capacity(feeds_count as usize);
+        // if let Some(res) = rx.recv().await {
+        //     match res {
+        //         StorageEvent::FetchAll(mut channels) => items.append(&mut channels),
+        //     }
+        // }
+
+        // let _ = db.store_all(&items);
 
         Ok(Self {
             config,
@@ -66,7 +69,7 @@ impl App {
             running: true,
             dimensions,
             active_view: ActiveView::Feeds,
-            feeds: StatefulList::<Channel>::with_items(items),
+            feeds: StatefulList::<Feed>::with_items(items),
             feeds_scroll: ScrollbarState::default().content_length(feeds_count),
             items: StatefulList::<Item>::default(),
             items_scroll: ScrollbarState::default(),
@@ -100,7 +103,7 @@ impl App {
         false
     }
 
-    pub fn current_feed(&self) -> Option<&Channel> {
+    pub fn current_feed(&self) -> Option<&Feed> {
         self.feeds
             .state
             .selected()
@@ -251,7 +254,7 @@ impl App {
         }
     }
 
-    fn set_feeds(&mut self, feeds: Vec<Channel>) {
+    fn set_feeds(&mut self, feeds: Vec<Feed>) {
         self.feeds = StatefulList::with_items(feeds)
     }
 

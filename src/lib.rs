@@ -1,5 +1,3 @@
-#![feature(future_join)]
-
 pub mod app;
 pub mod config;
 pub mod db;

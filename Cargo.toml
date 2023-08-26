@@ -7,13 +7,13 @@ edition = "2021"
 
 [dependencies]
 anyhow = "1"
+chrono = "0.4.26"
 clap = { version = "4.4", features = ["derive"] }
 colorsys = "0.6.7"
 crossterm = "0.27"
 directories = "5"
-gluesql = { version = "0.14", default-features = false, features = [
-    "sled-storage",
-] }
+futures = "0.3.28"
+polodb_core = "4.4.0"
 reqwest = { version = "0.11" }
 rss = { version = "2", features = ["atom"] }
 serde = { version = "1", features = ["derive"] }

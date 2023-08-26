@@ -54,7 +54,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         app.feeds
             .items()
             .iter()
-            .map(|channel| ListItem::new(format!("{} ({})", channel.title, channel.items().len())))
+            .map(|feed| ListItem::new(format!("{} ({})", feed.title(), feed.items().len())))
             .collect::<Vec<_>>(),
     )
     .block(left)
@@ -71,9 +71,9 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
         .selected()
         .and_then(|i| app.feeds.items().get(i));
 
-    if let Some(channel) = current_feed {
+    if let Some(feed) = current_feed {
         let block = Block::default()
-            .title(channel.title())
+            .title(feed.title())
             .title_alignment(Alignment::Left)
             .padding(if app.should_render_items_scroll() {
                 Padding {
@@ -94,11 +94,10 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             .border_type(BorderType::Plain);
 
         let items_list = List::new(
-            channel
-                .items()
+            feed.items()
                 .iter()
                 .map(|item| {
-                    let title = item.title.clone().unwrap_or("default".into());
+                    let title = item.title().clone().unwrap_or("default".into());
                     ListItem::new(title)
                 })
                 .collect::<Vec<_>>(),
@@ -160,24 +159,8 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                 .wrap(Wrap { trim: true })
                 .alignment(Alignment::Center);
 
-            let author = Paragraph::new(
-                detail
-                    .author()
-                    .and_then(|s| Some(s.to_owned()))
-                    .or(detail
-                        .itunes_ext()
-                        .and_then(|it| it.author().and_then(|auth| Some(auth.to_owned()))))
-                    .or(detail.dublin_core_ext().and_then(|dc| {
-                        let creators = dc.creators().join(", ");
-                        if creators.is_empty() {
-                            None
-                        } else {
-                            Some(creators)
-                        }
-                    }))
-                    .unwrap_or("[anonymous]".to_owned()),
-            )
-            .alignment(Alignment::Center);
+            let author = Paragraph::new(detail.author().unwrap_or("[anonymous]"))
+                .alignment(Alignment::Center);
 
             let date = Paragraph::new(detail.pub_date().unwrap_or("")).alignment(Alignment::Center);
 
