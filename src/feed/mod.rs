@@ -77,7 +77,11 @@ pub struct Item {
     title: Option<String>,
     author: Option<String>,
     content: Option<String>,
+    #[serde(skip)]
+    text_content: Option<String>,
     description: Option<String>,
+    #[serde(skip)]
+    text_description: Option<String>,
     categories: Vec<Category>,
     link: Option<String>,
     pub_date: Option<String>,
@@ -93,11 +97,25 @@ impl Item {
     }
 
     pub fn content(&self) -> Option<&str> {
-        self.content.as_deref()
+        if self.text_content.is_some() {
+            self.text_content.as_deref()
+        } else {
+            self.content.as_deref()
+        }
     }
 
     pub fn description(&self) -> Option<&str> {
-        self.description.as_deref()
+        // if self.author.as_deref().unwrap_or_default() == "Joe Birch" {
+        //     panic!(
+        //         "{:?}",
+        //         crate::ui::detail::p(self.description.as_deref().unwrap())
+        //     );
+        // }
+        if self.text_description.is_some() {
+            self.text_description.as_deref()
+        } else {
+            self.description.as_deref()
+        }
     }
 
     pub fn categories(&self) -> &[Category] {
@@ -135,7 +153,9 @@ impl From<&ChannelItem> for Item {
             title: value.title.clone(),
             author,
             content: value.content.clone(),
+            text_content: None,
             description: value.description.clone(),
+            text_description: None,
             categories: value
                 .categories
                 .iter()
