@@ -1,8 +1,10 @@
 use anyhow;
-use chrono::DateTime;
+use chrono::{DateTime, FixedOffset};
 use rss::{Channel, Item as ChannelItem};
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
+
+mod html;
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Feed {
@@ -41,9 +43,15 @@ impl Feed {
         &self.items
     }
 
+    pub fn last_fetched(&self) -> Option<&str> {
+        self.last_fetched.as_deref()
+    }
+
     pub fn read_from<R: BufRead>(reader: R) -> anyhow::Result<Feed> {
         let channel = Channel::read_from(reader)?;
-        Ok(channel.into())
+        let mut feed = Feed::from(channel);
+        feed.last_fetched = Some(DateTime::<FixedOffset>::default().to_rfc2822());
+        Ok(feed)
     }
 }
 
@@ -77,10 +85,8 @@ pub struct Item {
     title: Option<String>,
     author: Option<String>,
     content: Option<String>,
-    #[serde(skip)]
     text_content: Option<String>,
     description: Option<String>,
-    #[serde(skip)]
     text_description: Option<String>,
     categories: Vec<Category>,
     link: Option<String>,
@@ -105,12 +111,6 @@ impl Item {
     }
 
     pub fn description(&self) -> Option<&str> {
-        // if self.author.as_deref().unwrap_or_default() == "Joe Birch" {
-        //     panic!(
-        //         "{:?}",
-        //         crate::ui::detail::p(self.description.as_deref().unwrap())
-        //     );
-        // }
         if self.text_description.is_some() {
             self.text_description.as_deref()
         } else {
@@ -149,13 +149,19 @@ impl From<&ChannelItem> for Item {
                 }
             }));
 
+        let text_description = if let Some(d) = value.description() {
+            html::parse_html(&d).ok()
+        } else {
+            None
+        };
+
         Self {
             title: value.title.clone(),
             author,
             content: value.content.clone(),
             text_content: None,
             description: value.description.clone(),
-            text_description: None,
+            text_description,
             categories: value
                 .categories
                 .iter()

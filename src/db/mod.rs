@@ -1,14 +1,15 @@
 use crate::config::Config;
-use crate::feed::{Feed, Item};
+use crate::feed::Feed;
 use anyhow::Result;
-use polodb_core::results::InsertManyResult;
-use polodb_core::{bson::doc, Database};
+use polodb_core::{bson, bson::doc, Database};
 use std::fmt::Debug;
 use tokio::sync::mpsc::{self, UnboundedSender};
 
 #[derive(Clone, Debug)]
 pub enum StorageEvent {
-    FetchAll(Vec<Feed>),
+    RetrievedAll(Vec<Feed>),
+    Requesting(usize),
+    Fetched((usize, usize)),
 }
 
 #[derive(Debug)]
@@ -47,29 +48,8 @@ impl Repository {
         })
     }
 
-    pub fn fetch_all_by_url(&mut self, urls: &[String]) -> anyhow::Result<Vec<Feed>> {
+    pub fn fetch_all_by_url(&mut self, _urls: &[String]) -> anyhow::Result<Vec<Feed>> {
         let feeds = self.db.collection::<Feed>("feeds");
-        // let mut concat = "[".to_string();
-        // concat.push_str(
-        //     &urls
-        //         .iter()
-        //         .map(|s| {
-        //             let mut a = "\"".to_string();
-        //             a.push_str(s);
-        //             a.push_str("\"");
-        //             a
-        //         })
-        //         .collect::<Vec<String>>()
-        //         .join(", "),
-        // );
-        // concat.push_str("]");
-
-        // println!(
-        //     "{:?}",
-        //     doc! {
-        //         "link": { "$in": ["https://atomicbird.com/index.xml", "https://stackoverflow.blog/feed/", "https://www.joshwcomeau.com/rss.xml", "https://buffer.com/resources/overflow/rss/", "https://feeds.simplecast.com/dLRotFGk", "https://www.nasa.gov/rss/dyn/breaking_news.rss", "https://shirtloadsofscience.libsyn.com/rss"] }
-        //     }
-        // );
         let cursor = feeds.find(None)?;
 
         Ok(cursor
@@ -78,21 +58,42 @@ impl Repository {
             .collect::<Vec<Feed>>())
     }
 
-    pub fn store_all(&self, feeds: &Vec<Feed>) -> polodb_core::Result<InsertManyResult> {
-        self.db.collection::<Feed>("feeds").insert_many(feeds)
+    pub fn store_all(&self, feeds: &Vec<Feed>) -> anyhow::Result<()> {
+        let collection = self.db.collection::<Feed>("feeds");
+        for feed in feeds {
+            let query = doc! {  "link": feed.link() };
+            let update = bson::to_document(feed)?;
+
+            match collection.find_one(query.clone()) {
+                Ok(Some(_)) => {
+                    let _ = collection.update_one(query, update);
+                }
+                Ok(None) => {
+                    let _ = collection.insert_one(feed);
+                }
+                Err(_) => {}
+            }
+        }
+
+        Ok(())
     }
 
-    pub async fn refresh_all_by_url(&mut self, urls: &[String]) {
+    pub fn refresh_all_by_url(&mut self, urls: &[String]) {
         let app_tx = self.app_tx.clone();
         let urls = urls.to_vec();
+        let count = urls.len();
+
+        let _ = app_tx.send(StorageEvent::Requesting(count));
 
         tokio::spawn(async move {
             let futures: Vec<_> = urls.into_iter().map(reqwest::get).collect();
             let handles: Vec<_> = futures
                 .into_iter()
-                .map(|req| {
+                .enumerate()
+                .map(|(n, req)| {
+                    let app_tx = app_tx.clone();
                     tokio::task::spawn(async move {
-                        match req.await {
+                        let res = match req.await {
                             Ok(res) => match res.bytes().await {
                                 Ok(bytes) => match Feed::read_from(&bytes[..]) {
                                     Ok(feed) => Ok(feed),
@@ -101,7 +102,9 @@ impl Repository {
                                 Err(_) => Err(FetchErr::Deserialize),
                             },
                             Err(_) => Err(FetchErr::Request),
-                        }
+                        };
+                        let _ = app_tx.send(StorageEvent::Fetched((n, count)));
+                        res
                     })
                 })
                 .collect();
@@ -117,7 +120,7 @@ impl Repository {
                 })
                 .collect();
 
-            app_tx.send(StorageEvent::FetchAll(feeds))
+            app_tx.send(StorageEvent::RetrievedAll(feeds))
         });
     }
 }

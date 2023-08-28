@@ -1,11 +1,12 @@
-use crate::app::{ActiveView, App};
+use crate::app::{ActiveView, App, LoadState};
 use tui::{
     backend::Backend,
     layout::Alignment,
-    prelude::{Constraint, Direction, Layout, Margin, Span},
-    style::{Color, Modifier, Style, Stylize},
+    prelude::{Constraint, Direction, Layout, Margin},
+    style::{Color, Modifier, Style},
     widgets::{
-        scrollbar, Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Scrollbar, Wrap,
+        scrollbar, Block, BorderType, Borders, Gauge, List, ListItem, Padding, Paragraph,
+        Scrollbar, Wrap,
     },
     Frame,
 };
@@ -14,10 +15,11 @@ pub mod detail;
 
 /// Renders the user interface widgets.
 pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
-    // This is where you add new widgets.
-    // See the following resources:
-    // - https://docs.rs/ratatui/latest/ratatui/widgets/index.html
-    // - https://github.com/ratatui-org/ratatui/tree/master/examples
+    let wrapper = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(30), Constraint::Length(1)])
+        .split(frame.size());
+
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -28,7 +30,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             ]
             .as_ref(),
         )
-        .split(frame.size());
+        .split(wrapper[0]);
 
     let left = Block::default()
         .title("Feeds")
@@ -182,42 +184,13 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                 }))
                 .scroll((app.detail_scroll_index, 0));
 
-            // let spans = vec![
-            //     Span::from("abc "),
-            //     Span::from("def ".red()),
-            //     Span::from("ghi ".green()),
-            //     Span::from("jkl "),
-            //     Span::from("mno "),
-            //     Span::from("pqr ".yellow()),
-            //     Span::from("stu "),
-            //     Span::from("vwx "),
-            //     Span::from("yz "),
-            //     Span::from("a man, a plan, a canal, panama".blue()),
-            //     Span::from("a box of biscuits, "),
-            //     Span::from("a box of mixed biscuits"),
-            //     Span::from("and a biscuit mixer"),
-            // ];
-            // let body = Paragraph::from(Spans)
-            //     .wrap(Wrap { trim: true })
-            //     .block(Block::default().padding(Padding {
-            //         top: 0,
-            //         bottom: 0,
-            //         left: 1,
-            //         right: if app.should_render_detail_scroll() {
-            //             2
-            //         } else {
-            //             1
-            //         },
-            //     }))
-            //     .scroll((app.detail_scroll_index, 0));
-
             frame.render_widget(title, content_chunks[0]);
             frame.render_widget(author, content_chunks[1]);
             frame.render_widget(date, content_chunks[2]);
             frame.render_widget(
                 Block::default()
                     .borders(Borders::TOP)
-                    .border_style(Style::default().add_modifier(Modifier::DIM))
+                    .border_style(app.config.theme().border())
                     .padding(Padding::vertical(1)),
                 content_chunks[3],
             );
@@ -271,5 +244,46 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             }),
             &mut app.feeds_scroll,
         );
+    }
+
+    match app.load_state {
+        LoadState::Loading((n, count)) => {
+            frame.render_widget(
+                Gauge::default()
+                    .ratio(n as f64 / count as f64)
+                    .label(format!("Loading {}/{}", n, count))
+                    .use_unicode(true)
+                    .style(app.config.theme().base())
+                    .gauge_style(app.config.theme().base()),
+                wrapper[1],
+            );
+        }
+        LoadState::Done => {
+            let text = match app.current_feed().cloned() {
+                Some(feed) => {
+                    let mut message = String::from("Last fetched: ");
+                    let date = feed.last_fetched().unwrap_or("never").into();
+                    message.push_str(date);
+                    message
+                }
+                _ => "No selection".to_string(),
+            };
+            frame.render_widget(
+                Block::default()
+                    .title_alignment(Alignment::Center)
+                    .title(text)
+                    .style(app.config.theme().base()),
+                wrapper[1],
+            );
+        }
+        LoadState::Errored => {
+            frame.render_widget(
+                Block::default()
+                    .title_alignment(Alignment::Center)
+                    .title("ERROR")
+                    .style(app.config.theme().base()),
+                wrapper[1],
+            );
+        }
     }
 }

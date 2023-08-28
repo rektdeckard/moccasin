@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::error;
 use std::process::{Child, Command, Stdio};
+use std::task::Poll;
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 use tui::widgets::{ListState, ScrollbarState};
 
@@ -27,6 +28,13 @@ pub struct Args {
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
+#[derive(Debug)]
+pub enum LoadState {
+    Loading((usize, usize)),
+    Errored,
+    Done,
+}
+
 /// Application.
 #[derive(Debug)]
 pub struct App {
@@ -40,6 +48,7 @@ pub struct App {
     pub items_scroll: ScrollbarState,
     pub detail_scroll: ScrollbarState,
     pub detail_scroll_index: u16,
+    pub load_state: LoadState,
     dimensions: (u16, u16),
     rx: UnboundedReceiver<StorageEvent>,
 }
@@ -49,19 +58,11 @@ impl App {
         let urls = config.feed_urls();
         let feeds_count = urls.len() as u16;
 
-        let (tx, mut rx) = mpsc::unbounded_channel::<StorageEvent>();
+        let (tx, rx) = mpsc::unbounded_channel::<StorageEvent>();
         let mut db = Repository::init(&config, tx).await?;
+
         let items = db.fetch_all_by_url(urls)?;
-        // db.refresh_all_by_url(urls).await;
-
-        // let mut items: Vec<Feed> = Vec::with_capacity(feeds_count as usize);
-        // if let Some(res) = rx.recv().await {
-        //     match res {
-        //         StorageEvent::FetchAll(mut channels) => items.append(&mut channels),
-        //     }
-        // }
-
-        // let _ = db.store_all(&items);
+        db.refresh_all_by_url(urls);
 
         Ok(Self {
             config,
@@ -75,12 +76,44 @@ impl App {
             items_scroll: ScrollbarState::default(),
             detail_scroll: ScrollbarState::default(),
             detail_scroll_index: 0,
+            load_state: LoadState::Done,
             rx,
         })
     }
 
     /// Handles the tick event of the terminal.
-    pub fn tick(&self) {}
+    pub fn tick(&mut self) {
+        let waker = futures::task::noop_waker();
+        let mut cx = std::task::Context::from_waker(&waker);
+
+        loop {
+            match self.rx.poll_recv(&mut cx) {
+                Poll::Ready(m) => match m {
+                    Some(StorageEvent::Requesting(amount)) => {
+                        self.load_state = LoadState::Loading((0, amount));
+                    }
+                    Some(StorageEvent::Fetched(counts)) => {
+                        let counts = match self.load_state {
+                            LoadState::Loading((current, total)) => (current + 1, total),
+                            _ => counts,
+                        };
+                        self.load_state = LoadState::Loading(counts);
+                    }
+                    Some(StorageEvent::RetrievedAll(feeds)) => {
+                        let _ = self.db.store_all(&feeds);
+                        self.set_feeds(feeds);
+                        self.load_state = LoadState::Done;
+                    }
+                    None => {
+                        break;
+                    }
+                },
+                Poll::Pending => {
+                    break;
+                }
+            }
+        }
+    }
 
     /// Set running to false to quit the application.
     pub fn quit(&mut self) {
@@ -171,19 +204,31 @@ impl App {
         );
     }
 
-    pub fn next_view(&mut self) {
+    pub fn next_view(&mut self, wrap: bool) {
         if let Some(next_view) = match self.active_view {
             ActiveView::Feeds => Some(ActiveView::Items),
             ActiveView::Items => Some(ActiveView::Detail),
-            ActiveView::Detail => None,
+            ActiveView::Detail => {
+                if wrap {
+                    Some(ActiveView::Feeds)
+                } else {
+                    None
+                }
+            }
         } {
             self.active_view = next_view;
         }
     }
 
-    pub fn prev_view(&mut self) {
+    pub fn prev_view(&mut self, wrap: bool) {
         if let Some(next_view) = match self.active_view {
-            ActiveView::Feeds => None,
+            ActiveView::Feeds => {
+                if wrap {
+                    Some(ActiveView::Detail)
+                } else {
+                    None
+                }
+            }
             ActiveView::Items => Some(ActiveView::Feeds),
             ActiveView::Detail => Some(ActiveView::Items),
         } {
@@ -227,7 +272,7 @@ impl App {
         }
     }
 
-    pub fn enter(&mut self) {
+    pub fn open(&mut self) {
         match self.active_view {
             ActiveView::Feeds => {
                 if let Some(feed) = self.current_feed() {
@@ -254,8 +299,14 @@ impl App {
         }
     }
 
+    pub fn refresh_all(&mut self) {
+        let _ = self.db.refresh_all_by_url(&self.config.feed_urls());
+    }
+
     fn set_feeds(&mut self, feeds: Vec<Feed>) {
-        self.feeds = StatefulList::with_items(feeds)
+        self.feeds.items = feeds;
+        self.feeds.state.select(None);
+        self.next_feed();
     }
 
     fn reset_items_scroll(&mut self) {

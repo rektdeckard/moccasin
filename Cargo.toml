@@ -13,6 +13,7 @@ colorsys = "0.6.7"
 crossterm = "0.27"
 directories = "5"
 futures = "0.3.28"
+html-escape = "0.2.13"
 html_parser = "0.7.0"
 polodb_core = "4.4.0"
 reqwest = { version = "0.11" }

@@ -14,7 +14,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
 
     match key_event.code {
         // Exit application on `ESC` or `q`
-        KeyCode::Esc | KeyCode::Char('q') => {
+        KeyCode::Esc | KeyCode::Char('q') | KeyCode::Char('Q') => {
             app.quit();
         }
         // Exit application on `Ctrl-C`
@@ -30,15 +30,24 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Up | KeyCode::Char('k') => {
             app.prev();
         }
-        KeyCode::Right | KeyCode::Tab | KeyCode::Char('l') => {
-            app.next_view();
+        KeyCode::Right | KeyCode::Char('l') => {
+            app.next_view(false);
         }
-        KeyCode::Left | KeyCode::BackTab | KeyCode::Char('h') => {
-            app.prev_view();
+        KeyCode::Tab => {
+            app.next_view(true);
+        }
+        KeyCode::Left | KeyCode::Char('h') => {
+            app.prev_view(false);
+        }
+        KeyCode::BackTab => {
+            app.prev_view(false);
         }
         // Other handlers you could add here.
-        KeyCode::Enter => {
-            app.enter();
+        KeyCode::Char('o') => {
+            app.open();
+        }
+        KeyCode::Char('r') => {
+            app.refresh_all();
         }
         KeyCode::Char(',') => {
             app.open_config();
@@ -57,10 +66,10 @@ pub fn handle_mouse_events(mouse_event: MouseEvent, app: &mut App) -> AppResult<
             app.prev();
         }
         MouseEventKind::ScrollRight | MouseEventKind::Down(MouseButton::Left) => {
-            app.next_view();
+            app.next_view(false);
         }
         MouseEventKind::ScrollLeft | MouseEventKind::Down(MouseButton::Right) => {
-            app.prev_view();
+            app.prev_view(false);
         }
         _ => {}
     }
