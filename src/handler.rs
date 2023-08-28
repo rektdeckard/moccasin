@@ -30,7 +30,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Up | KeyCode::Char('k') => {
             app.prev();
         }
-        KeyCode::Right | KeyCode::Char('l') => {
+        KeyCode::Right | KeyCode::Enter | KeyCode::Char('l') => {
             app.next_view(false);
         }
         KeyCode::Tab => {
@@ -40,7 +40,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             app.prev_view(false);
         }
         KeyCode::BackTab => {
-            app.prev_view(false);
+            app.prev_view(true);
         }
         // Other handlers you could add here.
         KeyCode::Esc => {

@@ -1,6 +1,6 @@
 use crate::config::Config;
-use crate::db::{Repository, StorageEvent};
 use crate::feed::{Feed, Item};
+use crate::repo::{Repository, StorageEvent};
 use anyhow::Result;
 use clap::Parser;
 use std::error;
@@ -39,7 +39,7 @@ pub enum LoadState {
 #[derive(Debug)]
 pub struct App {
     pub config: Config,
-    pub db: Repository,
+    pub repo: Repository,
     pub running: bool,
     pub active_view: ActiveView,
     pub feeds: StatefulList<Feed>,
@@ -59,14 +59,14 @@ impl App {
         let feeds_count = urls.len() as u16;
 
         let (tx, rx) = mpsc::unbounded_channel::<StorageEvent>();
-        let mut db = Repository::init(&config, tx).await?;
+        let mut repo = Repository::init(&config, tx).await?;
 
-        let items = db.fetch_all_by_url(urls)?;
-        db.refresh_all_by_url(urls);
+        let items = repo.get_all_from_db(&config)?;
+        repo.refresh_all(&config);
 
         Ok(Self {
             config,
-            db,
+            repo,
             running: true,
             dimensions,
             active_view: ActiveView::Feeds,
@@ -100,7 +100,7 @@ impl App {
                         self.load_state = LoadState::Loading(counts);
                     }
                     Some(StorageEvent::RetrievedAll(feeds)) => {
-                        let _ = self.db.store_all(&feeds);
+                        let _ = self.repo.store_all(&feeds);
                         self.set_feeds(feeds);
                         self.load_state = LoadState::Done;
                     }
@@ -205,9 +205,23 @@ impl App {
     }
 
     pub fn next_view(&mut self, wrap: bool) {
+        let has_current_feed = self.current_feed().is_some();
+        let has_current_item = self.current_item().is_some();
+
+        if !has_current_feed {
+            self.active_view = ActiveView::Feeds;
+            return;
+        }
+
         if let Some(next_view) = match self.active_view {
             ActiveView::Feeds => Some(ActiveView::Items),
-            ActiveView::Items => Some(ActiveView::Detail),
+            ActiveView::Items => {
+                if has_current_item {
+                    Some(ActiveView::Detail)
+                } else {
+                    None
+                }
+            }
             ActiveView::Detail => {
                 if wrap {
                     Some(ActiveView::Feeds)
@@ -221,9 +235,17 @@ impl App {
     }
 
     pub fn prev_view(&mut self, wrap: bool) {
+        let has_current_feed = self.current_feed().is_some();
+        let has_current_item = self.current_item().is_some();
+
+        if !has_current_feed {
+            self.active_view = ActiveView::Feeds;
+            return;
+        }
+
         if let Some(next_view) = match self.active_view {
             ActiveView::Feeds => {
-                if wrap {
+                if wrap && has_current_item {
                     Some(ActiveView::Detail)
                 } else {
                     None
@@ -273,9 +295,12 @@ impl App {
     }
 
     pub fn unselect(&mut self) {
-        self.feeds.state.select(None);
-        self.items.state.select(None);
-        self.active_view = ActiveView::Feeds;
+        if self.current_item().is_some() {
+            self.items.state.select(None);
+        } else {
+            self.feeds.state.select(None);
+        }
+        self.prev_view(false);
     }
 
     pub fn open(&mut self) {
@@ -306,7 +331,7 @@ impl App {
     }
 
     pub fn refresh_all(&mut self) {
-        let _ = self.db.refresh_all_by_url(&self.config.feed_urls());
+        let _ = self.repo.refresh_all(&self.config);
     }
 
     fn set_feeds(&mut self, feeds: Vec<Feed>) {
@@ -316,7 +341,7 @@ impl App {
     }
 
     fn reset_items_scroll(&mut self) {
-        self.items.state.select(Some(0));
+        self.items.state.select(None);
         self.items_scroll = self.items_scroll.position(0);
     }
 

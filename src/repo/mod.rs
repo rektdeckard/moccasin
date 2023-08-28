@@ -1,4 +1,4 @@
-use crate::config::Config;
+use crate::config::{Config, SortOrder};
 use crate::feed::Feed;
 use anyhow::Result;
 use polodb_core::{bson, bson::doc, Database};
@@ -32,6 +32,27 @@ impl Debug for Repository {
     }
 }
 
+fn sort_feeds(feeds: &mut Vec<Feed>, config: &Config) {
+    match config.sort_order() {
+        SortOrder::Az => {
+            feeds.sort_by(|a, b| a.title().partial_cmp(b.title()).unwrap());
+        }
+        SortOrder::Za => {
+            feeds.sort_by(|a, b| b.title().partial_cmp(a.title()).unwrap());
+        }
+        SortOrder::Custom => {
+            let urls = config.feed_urls();
+            feeds.sort_by(|a, b| {
+                let a_index = urls.iter().position(|u| a.link() == u).unwrap_or_default();
+                let b_index = urls.iter().position(|u| b.link() == u).unwrap_or_default();
+                a_index.cmp(&b_index)
+            })
+        }
+        SortOrder::Newest => feeds.sort_by(|a, b| a.last_fetched().cmp(&b.last_fetched())),
+        SortOrder::Oldest => feeds.sort_by(|a, b| b.last_fetched().cmp(&a.last_fetched())),
+    }
+}
+
 impl Repository {
     pub async fn init(config: &Config, app_tx: UnboundedSender<StorageEvent>) -> Result<Self> {
         let db = Database::open_file(config.db_path()).expect("could not open db");
@@ -48,7 +69,7 @@ impl Repository {
         })
     }
 
-    pub fn fetch_all_by_url(&mut self, _urls: &[String]) -> anyhow::Result<Vec<Feed>> {
+    pub fn get_all_from_db(&mut self, config: &Config) -> anyhow::Result<Vec<Feed>> {
         let feeds = self.db.collection::<Feed>("feeds");
         let cursor = feeds.find(None)?;
 
@@ -56,7 +77,8 @@ impl Repository {
             .into_iter()
             .filter_map(|f| f.ok())
             .collect::<Vec<Feed>>();
-        feeds.sort_by(|a, b| a.title().partial_cmp(b.title()).unwrap());
+
+        sort_feeds(&mut feeds, config);
         Ok(feeds)
     }
 
@@ -80,9 +102,10 @@ impl Repository {
         Ok(())
     }
 
-    pub fn refresh_all_by_url(&mut self, urls: &[String]) {
+    pub fn refresh_all(&mut self, config: &Config) {
         let app_tx = self.app_tx.clone();
-        let urls = urls.to_vec();
+        let config = config.clone();
+        let urls = config.feed_urls().clone();
         let count = urls.len();
 
         let _ = app_tx.send(StorageEvent::Requesting(count));
@@ -98,12 +121,24 @@ impl Repository {
                         let res = match req.await {
                             Ok(res) => match res.bytes().await {
                                 Ok(bytes) => match Feed::read_from(&bytes[..]) {
-                                    Ok(feed) => Ok(feed),
-                                    Err(_) => Err(FetchErr::Parse),
+                                    Ok(feed) => {
+                                        // panic!("{:?}", feed);
+                                        Ok(feed)
+                                    }
+                                    Err(_) => {
+                                        // panic!("parse");
+                                        Err(FetchErr::Parse)
+                                    }
                                 },
-                                Err(_) => Err(FetchErr::Deserialize),
+                                Err(_) => {
+                                    // panic!("deserialize");
+                                    Err(FetchErr::Deserialize)
+                                }
                             },
-                            Err(_) => Err(FetchErr::Request),
+                            Err(_) => {
+                                // panic!("fetch");
+                                Err(FetchErr::Request)
+                            }
                         };
                         let _ = app_tx.send(StorageEvent::Fetched((n, count)));
                         res
@@ -121,8 +156,8 @@ impl Repository {
                     _ => None,
                 })
                 .collect();
-            feeds.sort_by(|a, b| a.title().partial_cmp(b.title()).unwrap());
 
+            sort_feeds(&mut feeds, &config);
             app_tx.send(StorageEvent::RetrievedAll(feeds))
         });
     }
