@@ -62,9 +62,16 @@ fn flatten_html(node: &Node) -> Result<Option<String>, HTMLParseError> {
                 Ok(Some(text))
             }
             "a" => {
-                let href = el.attributes.get("href").unwrap().as_deref(); // FIXME
                 let parts = flatten_nodes(&el.children, true);
-                Ok(Some(format!("{} ({})", parts, href.unwrap())))
+                if let Some(href) = el.attributes.get("href") {
+                    Ok(Some(format!(
+                        "{} ({})",
+                        parts,
+                        href.as_deref().unwrap_or_default()
+                    )))
+                } else {
+                    Ok(Some(parts))
+                }
             }
             // "img" => Ok(Some("[image] ".into())),
             _ => Ok(None),

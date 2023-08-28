@@ -52,10 +52,12 @@ impl Repository {
         let feeds = self.db.collection::<Feed>("feeds");
         let cursor = feeds.find(None)?;
 
-        Ok(cursor
+        let mut feeds = cursor
             .into_iter()
             .filter_map(|f| f.ok())
-            .collect::<Vec<Feed>>())
+            .collect::<Vec<Feed>>();
+        feeds.sort_by(|a, b| a.title().partial_cmp(b.title()).unwrap());
+        Ok(feeds)
     }
 
     pub fn store_all(&self, feeds: &Vec<Feed>) -> anyhow::Result<()> {
@@ -109,7 +111,7 @@ impl Repository {
                 })
                 .collect();
             let results = futures::future::join_all(handles).await;
-            let feeds: Vec<_> = results
+            let mut feeds: Vec<_> = results
                 .into_iter()
                 .filter_map(|handle| match handle {
                     Ok(res) => match res {
@@ -119,6 +121,7 @@ impl Repository {
                     _ => None,
                 })
                 .collect();
+            feeds.sort_by(|a, b| a.title().partial_cmp(b.title()).unwrap());
 
             app_tx.send(StorageEvent::RetrievedAll(feeds))
         });

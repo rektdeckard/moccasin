@@ -272,6 +272,12 @@ impl App {
         }
     }
 
+    pub fn unselect(&mut self) {
+        self.feeds.state.select(None);
+        self.items.state.select(None);
+        self.active_view = ActiveView::Feeds;
+    }
+
     pub fn open(&mut self) {
         match self.active_view {
             ActiveView::Feeds => {
@@ -305,8 +311,8 @@ impl App {
 
     fn set_feeds(&mut self, feeds: Vec<Feed>) {
         self.feeds.items = feeds;
-        self.feeds.state.select(None);
-        self.next_feed();
+        self.items.state.select(None);
+        self.active_view = ActiveView::Feeds;
     }
 
     fn reset_items_scroll(&mut self) {

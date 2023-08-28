@@ -2,7 +2,7 @@ use crate::app::{ActiveView, App, LoadState};
 use tui::{
     backend::Backend,
     layout::Alignment,
-    prelude::{Constraint, Direction, Layout, Margin},
+    prelude::*,
     style::{Color, Modifier, Style},
     widgets::{
         scrollbar, Block, BorderType, Borders, Gauge, List, ListItem, Padding, Paragraph,
@@ -17,9 +17,21 @@ pub mod detail;
 pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
     let wrapper = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Min(30), Constraint::Length(1)])
+        .constraints([
+            Constraint::Length(0),
+            Constraint::Min(10),
+            Constraint::Length(1),
+        ])
         .split(frame.size());
 
+    render_tabs_bar(app, frame, wrapper[0]);
+    render_main_area(app, frame, wrapper[1]);
+    render_status_bar(app, frame, wrapper[2]);
+}
+
+fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {}
+
+fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -30,7 +42,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             ]
             .as_ref(),
         )
-        .split(wrapper[0]);
+        .split(area);
 
     let left = Block::default()
         .title("Feeds")
@@ -160,7 +172,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                 .margin(2)
                 .split(chunks[2]);
 
-            let title = Paragraph::new(detail.title().unwrap_or("EMPTY"))
+            let title = Paragraph::new(detail.title().unwrap_or("[empty]"))
                 .style(Style::default().add_modifier(Modifier::ITALIC))
                 .wrap(Wrap { trim: true })
                 .alignment(Alignment::Center);
@@ -170,7 +182,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
 
             let date = Paragraph::new(detail.pub_date().unwrap_or("")).alignment(Alignment::Center);
 
-            let body = Paragraph::new(detail.description().unwrap_or("EMPTY"))
+            let body = Paragraph::new(detail.description().unwrap_or("[empty]"))
                 .wrap(Wrap { trim: true })
                 .block(Block::default().padding(Padding {
                     top: 0,
@@ -245,7 +257,9 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
             &mut app.feeds_scroll,
         );
     }
+}
 
+fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
     match app.load_state {
         LoadState::Loading((n, count)) => {
             frame.render_widget(
@@ -253,9 +267,8 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                     .ratio(n as f64 / count as f64)
                     .label(format!("Loading {}/{}", n, count))
                     .use_unicode(true)
-                    .style(app.config.theme().base())
                     .gauge_style(app.config.theme().base()),
-                wrapper[1],
+                area,
             );
         }
         LoadState::Done => {
@@ -266,14 +279,14 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                     message.push_str(date);
                     message
                 }
-                _ => "No selection".to_string(),
+                _ => "[no selection]".to_string(),
             };
             frame.render_widget(
                 Block::default()
                     .title_alignment(Alignment::Center)
                     .title(text)
                     .style(app.config.theme().base()),
-                wrapper[1],
+                area,
             );
         }
         LoadState::Errored => {
@@ -282,7 +295,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
                     .title_alignment(Alignment::Center)
                     .title("ERROR")
                     .style(app.config.theme().base()),
-                wrapper[1],
+                area,
             );
         }
     }
