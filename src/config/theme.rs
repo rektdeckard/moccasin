@@ -42,7 +42,7 @@ fn make_color(c: &str) -> Color {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Theme {
     base: Style,
     selection: Option<Style>,

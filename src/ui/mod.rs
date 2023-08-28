@@ -126,38 +126,59 @@ fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: R
             app.config.theme().selection()
         });
 
-        let _ = Paragraph::new("asd");
-
-        frame.render_stateful_widget(items_list, chunks[1], &mut app.items.state);
-        if app.should_render_items_scroll() {
+        if app.current_item().is_some() {
+            frame.render_stateful_widget(items_list, chunks[1], &mut app.items.state);
+            if app.should_render_items_scroll() {
+                frame.render_stateful_widget(
+                    Scrollbar::default()
+                        .begin_symbol(None)
+                        .end_symbol(None)
+                        .track_symbol(scrollbar::VERTICAL.thumb)
+                        .track_style(app.config.theme().scrollbar_track())
+                        .thumb_style(app.config.theme().scrollbar_thumb()),
+                    chunks[1].inner(&Margin {
+                        vertical: 1,
+                        horizontal: 1,
+                    }),
+                    &mut app.items_scroll,
+                );
+            }
+        } else {
             frame.render_stateful_widget(
-                Scrollbar::default()
-                    .begin_symbol(None)
-                    .end_symbol(None)
-                    .track_symbol(scrollbar::VERTICAL.thumb)
-                    .track_style(app.config.theme().scrollbar_track())
-                    .thumb_style(app.config.theme().scrollbar_thumb()),
-                chunks[1].inner(&Margin {
-                    vertical: 1,
-                    horizontal: 1,
-                }),
-                &mut app.items_scroll,
+                items_list,
+                chunks[1].union(chunks[2]),
+                &mut app.items.state,
             );
+            if app.should_render_items_scroll() {
+                frame.render_stateful_widget(
+                    Scrollbar::default()
+                        .begin_symbol(None)
+                        .end_symbol(None)
+                        .track_symbol(scrollbar::VERTICAL.thumb)
+                        .track_style(app.config.theme().scrollbar_track())
+                        .thumb_style(app.config.theme().scrollbar_thumb()),
+                    chunks[1].union(chunks[2]).inner(&Margin {
+                        vertical: 1,
+                        horizontal: 1,
+                    }),
+                    &mut app.items_scroll,
+                );
+            }
         }
 
-        let block = Block::default()
-            .title("Detail")
-            .title_alignment(Alignment::Left)
-            .padding(Padding::uniform(1))
-            .style(app.config.theme().base())
-            .borders(Borders::ALL)
-            .border_style(if app.active_view == ActiveView::Detail {
-                app.config.theme().active_border()
-            } else {
-                app.config.theme().border()
-            });
-
         if let Some(detail) = &app.current_item() {
+            let block = Block::default()
+                .title("Detail")
+                .title_alignment(Alignment::Left)
+                .padding(Padding::uniform(1))
+                .style(app.config.theme().base())
+                .borders(Borders::ALL)
+                .border_style(if app.active_view == ActiveView::Detail {
+                    app.config.theme().active_border()
+                } else {
+                    app.config.theme().border()
+                });
+
             frame.render_widget(block, chunks[2]);
 
             let content_chunks = Layout::default()
@@ -222,40 +243,40 @@ fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: R
                 );
             }
         }
-    } else {
-        frame.render_widget(
-            Block::default()
-                .title("Items")
-                .title_alignment(Alignment::Left)
-                .borders(Borders::ALL)
-                .style(app.config.theme().base()),
-            chunks[1],
-        );
-        frame.render_widget(
-            Block::default()
-                .title("Details")
-                .title_alignment(Alignment::Left)
-                .borders(Borders::ALL)
-                .style(app.config.theme().base()),
-            chunks[2],
-        );
-    }
 
-    frame.render_stateful_widget(feeds_list, chunks[0], &mut app.feeds.state);
-    if app.should_render_feeds_scroll() {
-        frame.render_stateful_widget(
-            Scrollbar::default()
-                .begin_symbol(None)
-                .end_symbol(None)
-                .track_symbol(scrollbar::VERTICAL.thumb)
-                .track_style(app.config.theme().scrollbar_track())
-                .thumb_style(app.config.theme().scrollbar_thumb()),
-            chunks[0].inner(&Margin {
-                vertical: 1,
-                horizontal: 1,
-            }),
-            &mut app.feeds_scroll,
-        );
+        frame.render_stateful_widget(feeds_list, chunks[0], &mut app.feeds.state);
+        if app.should_render_feeds_scroll() {
+            frame.render_stateful_widget(
+                Scrollbar::default()
+                    .begin_symbol(None)
+                    .end_symbol(None)
+                    .track_symbol(scrollbar::VERTICAL.thumb)
+                    .track_style(app.config.theme().scrollbar_track())
+                    .thumb_style(app.config.theme().scrollbar_thumb()),
+                chunks[0].inner(&Margin {
+                    vertical: 1,
+                    horizontal: 1,
+                }),
+                &mut app.feeds_scroll,
+            );
+        }
+    } else {
+        frame.render_stateful_widget(feeds_list, area, &mut app.feeds.state);
+        if app.should_render_feeds_scroll() {
+            frame.render_stateful_widget(
+                Scrollbar::default()
+                    .begin_symbol(None)
+                    .end_symbol(None)
+                    .track_symbol(scrollbar::VERTICAL.thumb)
+                    .track_style(app.config.theme().scrollbar_track())
+                    .thumb_style(app.config.theme().scrollbar_thumb()),
+                area.inner(&Margin {
+                    vertical: 1,
+                    horizontal: 1,
+                }),
+                &mut app.feeds_scroll,
+            );
+        }
     }
 }
 

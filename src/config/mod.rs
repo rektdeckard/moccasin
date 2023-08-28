@@ -3,8 +3,10 @@ use anyhow::Result;
 use directories::ProjectDirs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::str::FromStr;
 use std::{fs, fs::File};
 use toml::{toml, Table, Value};
+use toml_edit::{value, Document};
 
 mod theme;
 
@@ -12,13 +14,42 @@ const DEFAULT_CONFIG_FILE: &'static str = "tabss.toml";
 const DEFAULT_DB_FILE: &'static str = "tabss.db";
 const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Config {
     file_path: PathBuf,
     dir_path: PathBuf,
     feed_urls: Vec<String>,
+    sort_order: SortOrder,
     refresh_interval: u64,
     theme: theme::Theme,
+}
+
+#[derive(Debug, Clone, Default)]
+pub enum SortOrder {
+    #[default]
+    Az,
+    Za,
+    Newest,
+    Oldest,
+    Custom,
+}
+
+#[derive(Debug)]
+pub struct SortOrderError;
+
+impl FromStr for SortOrder {
+    type Err = SortOrderError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        match s {
+            "az" => Ok(SortOrder::Az),
+            "za" => Ok(SortOrder::Za),
+            "newest" => Ok(SortOrder::Newest),
+            "oldest" => Ok(SortOrder::Oldest),
+            "custom" => Ok(SortOrder::Custom),
+            _ => Ok(SortOrder::Az),
+        }
+    }
 }
 
 impl Config {
@@ -74,6 +105,10 @@ impl Config {
         &self.feed_urls
     }
 
+    pub fn sort_order(&self) -> &SortOrder {
+        &self.sort_order
+    }
+
     pub fn refresh_interval(&self) -> u64 {
         self.refresh_interval
     }
@@ -110,10 +145,20 @@ impl Config {
             })
             .unwrap_or_default();
 
+        let sort_order: SortOrder = preferences
+            .and_then(|prefs| {
+                prefs.get("sort_feeds").and_then(|ord| match ord {
+                    Value::String(ord) => Some(SortOrder::from_str(ord).unwrap()),
+                    _ => None,
+                })
+            })
+            .unwrap_or_default();
+
         Ok(Self {
             file_path,
             dir_path,
             feed_urls: feeds,
+            sort_order,
             refresh_interval: args.interval.unwrap_or(DEFAULT_REFRESH_INTERVAL),
             theme,
         })
@@ -123,21 +168,21 @@ impl Config {
         fs::create_dir_all(&dir_path)?;
         let cfg_path = Path::new(dir_path.as_path()).join(DEFAULT_CONFIG_FILE);
         let mut file = File::create(&cfg_path)?;
-        let stub = toml! {
-            [sources]
-            feeds = []
-
-            [preferences]
-            color_scheme = "default"
-            refresh_interval = DEFAULT_REFRESH_INTERVAL
-        };
-        file.write(toml::to_string_pretty(&stub).unwrap().as_bytes())?;
+        let stub = include_str!("tabss.toml").parse::<Table>()?;
+        let feed_urls = stub["sources"]["feeds"]
+            .as_array()
+            .expect("parse default feeds")
+            .iter()
+            .filter_map(Value::as_str)
+            .map(String::from)
+            .collect::<Vec<_>>();
+        file.write(&stub.to_string().as_bytes())?;
 
         // TODO: load theme from args if present
-
         Ok(Self {
             dir_path: dir_path.to_owned(),
             file_path: file_path.to_owned(),
+            feed_urls,
             refresh_interval: args.interval.unwrap_or(DEFAULT_REFRESH_INTERVAL),
             ..Default::default()
         })

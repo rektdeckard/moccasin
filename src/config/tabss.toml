@@ -1,0 +1,35 @@
+# tabss config
+# This file may be modified by tabss when changes are made via software,
+# E.G. importing OPML files or individual feeds and changing colorschemes.
+
+[sources]
+# List URLs for Atom or RSS feeds here
+feeds = ["https://feeds.feedburner.com/brainpickings/rss"]
+
+[preferences]
+# The TUI color scheme, either a built-in scheme name:
+#     "default" | "borland" | "jungle" | "matrix" | "redshift" | "wyse"
+# or a table of key-value pairs, in which value is either a hex color string,
+# a built-in color string, one of:
+#     | "black" | "red" | "yellow" | "blue" | "magenta" | "cyan" | "gray"
+#     | "darkgray" | "lightred" | "lightgreen" | "lightyellow" | "lightblue"
+#     | "lightmagenta" | "lightcyan" | "white"
+# or an inline table of fg and bg colors of the same type:
+#     [preferences.color_scheme]
+#     name = "borland"
+#     base = { fg = "#FFFFFF", bg = "#000080" }
+#     border = "#bbbbbb"
+#     active_border = "#FFFFFF"
+#     selection = { fg = "#000080", bg = "#bbbbbb" }
+#     active_selection = { fg = "#000080", bg = "#fefd72" }
+color_scheme = "default"
+
+# The default sort order of feeds in the left panel, one of:
+#     "az" | "za" | "newest" | "oldest" | "unread" | "custom"
+# where "custom" is the order listed in [sources.feeds], and "unread" is sorted
+# first by unread, then by newest.
+sort_feeds = "az"
+
+# How often to refresh feeds, in seconds.
+# The default is 300, and 0 means refresh will only occur on startup.
+refresh_interval = 300

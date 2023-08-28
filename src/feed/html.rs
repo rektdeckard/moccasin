@@ -38,12 +38,12 @@ fn flatten_html(node: &Node) -> Result<Option<String>, HTMLParseError> {
                 heading.push_str("\n\n");
                 Ok(Some(heading))
             }
-            "p" => {
+            "p" | "div" => {
                 let mut parts = flatten_nodes(&el.children, true);
                 parts.push_str("\n\n");
                 Ok(Some(parts))
             }
-            "b" | "i" | "strong" | "em" | "small" | "span" => {
+            "b" | "i" | "strong" | "em" | "small" | "span" | "pre" | "code" => {
                 let parts = flatten_nodes(&el.children, true);
                 Ok(Some(parts))
             }
