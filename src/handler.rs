@@ -12,10 +12,11 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         }
     }
 
-    // println!("{:?}", app.add_feed_state);
     if app.should_render_feed_input() {
         match key_event.code {
-            KeyCode::Char('c') | KeyCode::Char('C') if key_event.modifiers == KeyModifiers::CONTROL => {
+            KeyCode::Char('c') | KeyCode::Char('C')
+                if key_event.modifiers == KeyModifiers::CONTROL =>
+            {
                 app.quit();
             }
             KeyCode::Enter => app.submit_message(),
@@ -58,10 +59,8 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             app.quit();
         }
         // Exit application on `Ctrl-C`
-        KeyCode::Char('c') | KeyCode::Char('C') => {
-            if key_event.modifiers == KeyModifiers::CONTROL {
-                app.quit();
-            }
+        KeyCode::Char('c') | KeyCode::Char('C') if key_event.modifiers == KeyModifiers::CONTROL => {
+            app.quit();
         }
         // Arrow handlers
         KeyCode::Down | KeyCode::Char('j') => {
@@ -73,14 +72,14 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Right | KeyCode::Enter | KeyCode::Char('l') => {
             app.next_view(false);
         }
-        KeyCode::Tab => {
-            app.next_view(true);
-        }
         KeyCode::Left | KeyCode::Char('h') => {
             app.prev_view(false);
         }
+        KeyCode::Tab => {
+            app.next_tab();
+        }
         KeyCode::BackTab => {
-            app.prev_view(true);
+            app.prev_tab();
         }
         // Other handlers you could add here.
         KeyCode::Esc => {

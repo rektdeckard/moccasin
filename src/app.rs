@@ -45,7 +45,8 @@ pub struct App {
     pub config: Config,
     pub repo: Repository,
     pub running: bool,
-    pub active_view: ActiveView,
+    pub active_view: View,
+    pub active_tab: Tab,
     pub feeds: StatefulList<Feed>,
     pub feeds_scroll: ScrollbarState,
     pub items: StatefulList<Item>,
@@ -75,7 +76,8 @@ impl App {
             repo,
             running: true,
             dimensions,
-            active_view: ActiveView::Feeds,
+            active_view: View::MainList,
+            active_tab: Tab::Browse,
             feeds: StatefulList::<Feed>::with_items(items),
             feeds_scroll: ScrollbarState::default().content_length(feeds_count),
             items: StatefulList::<Item>::default(),
@@ -159,11 +161,11 @@ impl App {
     }
 
     pub fn should_render_feeds_scroll(&self) -> bool {
-        self.feeds.items().len() as u16 > self.dimensions.1 - 4
+        self.feeds.items().len() as u16 > self.dimensions.1 - 8
     }
 
     pub fn should_render_items_scroll(&self) -> bool {
-        self.items.items().len() as u16 > self.dimensions.1 - 4
+        self.items.items().len() as u16 > self.dimensions.1 - 8
     }
 
     pub fn should_render_detail_scroll(&self) -> bool {
@@ -247,29 +249,29 @@ impl App {
         let has_current_item = self.current_item().is_some();
 
         if !has_current_feed {
-            self.active_view = ActiveView::Feeds;
+            self.active_view = View::MainList;
             return;
         }
 
         if let Some(next_view) = match self.active_view {
-            ActiveView::Feeds => {
+            View::MainList => {
                 if self.items.state.selected().is_none() {
                     self.next_item();
                 }
-                Some(ActiveView::Items)
+                Some(View::SubList)
             }
-            ActiveView::Items => {
+            View::SubList => {
                 if has_current_item {
-                    Some(ActiveView::Detail)
+                    Some(View::Detail)
                 } else if wrap {
-                    Some(ActiveView::Feeds)
+                    Some(View::MainList)
                 } else {
                     None
                 }
             }
-            ActiveView::Detail => {
+            View::Detail => {
                 if wrap {
-                    Some(ActiveView::Feeds)
+                    Some(View::MainList)
                 } else {
                     None
                 }
@@ -284,22 +286,22 @@ impl App {
         let has_current_item = self.current_item().is_some();
 
         if !has_current_feed {
-            self.active_view = ActiveView::Feeds;
+            self.active_view = View::MainList;
             return;
         }
 
         if let Some(next_view) = match self.active_view {
-            ActiveView::Feeds => {
+            View::MainList => {
                 if wrap && has_current_item {
-                    Some(ActiveView::Detail)
+                    Some(View::Detail)
                 } else if wrap {
-                    Some(ActiveView::Items)
+                    Some(View::SubList)
                 } else {
                     None
                 }
             }
-            ActiveView::Items => Some(ActiveView::Feeds),
-            ActiveView::Detail => Some(ActiveView::Items),
+            View::SubList => Some(View::MainList),
+            View::Detail => Some(View::SubList),
         } {
             self.active_view = next_view;
         }
@@ -307,16 +309,16 @@ impl App {
 
     pub fn next(&mut self) {
         match self.active_view {
-            ActiveView::Feeds => {
+            View::MainList => {
                 self.reset_items_scroll();
                 self.reset_detail_scroll();
                 self.next_feed();
             }
-            ActiveView::Items => {
+            View::SubList => {
                 self.reset_detail_scroll();
                 self.next_item();
             }
-            ActiveView::Detail => {
+            View::Detail => {
                 self.detail_scroll_index = self.detail_scroll_index.saturating_add(1);
                 self.detail_scroll.next();
             }
@@ -325,20 +327,40 @@ impl App {
 
     pub fn prev(&mut self) {
         match self.active_view {
-            ActiveView::Feeds => {
+            View::MainList => {
                 self.reset_items_scroll();
                 self.reset_detail_scroll();
                 self.prev_feed();
             }
-            ActiveView::Items => {
+            View::SubList => {
                 self.reset_detail_scroll();
                 self.prev_item();
             }
-            ActiveView::Detail => {
+            View::Detail => {
                 self.detail_scroll_index = self.detail_scroll_index.saturating_sub(1);
                 self.detail_scroll.prev();
             }
         }
+    }
+
+    pub fn next_tab(&mut self) {
+        let next_tab = match self.active_tab {
+            Tab::Browse => Tab::Favorites,
+            Tab::Favorites => Tab::Tags,
+            Tab::Tags => Tab::Browse,
+        };
+
+        self.active_tab = next_tab;
+    }
+
+    pub fn prev_tab(&mut self) {
+        let prev_tab = match self.active_tab {
+            Tab::Browse => Tab::Tags,
+            Tab::Favorites => Tab::Browse,
+            Tab::Tags => Tab::Favorites,
+        };
+
+        self.active_tab = prev_tab;
     }
 
     pub fn unselect(&mut self) {
@@ -352,13 +374,13 @@ impl App {
 
     pub fn open(&mut self) {
         match self.active_view {
-            ActiveView::Feeds => {
+            View::MainList => {
                 if let Some(feed) = self.current_feed() {
                     let link = feed.link();
                     let _ = App::open_link(link);
                 }
             }
-            ActiveView::Items => {
+            View::SubList => {
                 if let Some(item) = self.current_item() {
                     if let Some(link) = item.link() {
                         let _ = App::open_link(link);
@@ -486,10 +508,37 @@ impl App {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum ActiveView {
-    Feeds,
-    Items,
+pub enum View {
+    MainList,
+    SubList,
     Detail,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum Tab {
+    Browse,
+    Favorites,
+    Tags,
+}
+
+impl ToString for Tab {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Browse => "Browse".into(),
+            Self::Favorites => "Favorites".into(),
+            Self::Tags => "Tags".into(),
+        }
+    }
+}
+
+impl Tab {
+    pub fn index_of(&self) -> usize {
+        match self {
+            Self::Browse => 0,
+            Self::Favorites => 1,
+            Self::Tags => 2,
+        }
+    }
 }
 
 #[derive(Default, Debug)]

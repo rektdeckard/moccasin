@@ -44,8 +44,8 @@ impl FromStr for SortOrder {
 
     fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         match s {
-            "az" => Ok(SortOrder::Az),
-            "za" => Ok(SortOrder::Za),
+            "a-z" => Ok(SortOrder::Az),
+            "z-a" => Ok(SortOrder::Za),
             "newest" => Ok(SortOrder::Newest),
             "oldest" => Ok(SortOrder::Oldest),
             "custom" => Ok(SortOrder::Custom),

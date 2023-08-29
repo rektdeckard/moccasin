@@ -8,7 +8,7 @@ feeds = ["https://feeds.feedburner.com/brainpickings/rss"]
 
 [preferences]
 # The TUI color scheme, either a built-in scheme name:
-#     "default" | "borland" | "focus" | "jungle" | "matrix" | "redshift" | "wyse"
+#     "default" | "borland" | "darcula" | "focus" | "jungle" | "matrix" | "redshift" | "wyse"
 # or a table of key-value pairs, in which value is either a hex color string,
 # a built-in color string, one of:
 #     | "black" | "red" | "yellow" | "blue" | "magenta" | "cyan" | "gray"
@@ -25,13 +25,14 @@ feeds = ["https://feeds.feedburner.com/brainpickings/rss"]
 #     selection = { fg = "#000080", bg = "#bbbbbb" }
 #     selection_active = { fg = "#000080", bg = "#fefd72" }
 #     scrollbar = { fg = "#FFFFFF", bg = "#bbbbbb" }
+# All values are optional, and will inherit sensible defaults if omitted.
 color_scheme = "default"
 
 # The default sort order of feeds in the left panel, one of:
-#     "az" | "za" | "newest" | "oldest" | "unread" | "custom"
+#     "a-z" | "z-a" | "newest" | "oldest" | "unread" | "custom"
 # where "custom" is the order listed in [sources.feeds], and "unread" is sorted
 # first by unread, then by newest.
-sort_feeds = "az"
+sort_feeds = "a-z"
 
 # How often to refresh feeds, in seconds.
 # The default is 300, and 0 means refresh will only occur on startup.
