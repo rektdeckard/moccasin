@@ -8,7 +8,7 @@ feeds = ["https://feeds.feedburner.com/brainpickings/rss"]
 
 [preferences]
 # The TUI color scheme, either a built-in scheme name:
-#     "default" | "borland" | "jungle" | "matrix" | "redshift" | "wyse"
+#     "default" | "borland" | "focus" | "jungle" | "matrix" | "redshift" | "wyse"
 # or a table of key-value pairs, in which value is either a hex color string,
 # a built-in color string, one of:
 #     | "black" | "red" | "yellow" | "blue" | "magenta" | "cyan" | "gray"
@@ -33,3 +33,6 @@ sort_feeds = "az"
 # How often to refresh feeds, in seconds.
 # The default is 300, and 0 means refresh will only occur on startup.
 refresh_interval = 300
+
+# How long to wait on a given feed before timing out, in seconds
+refresh_timeout = 5

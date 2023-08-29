@@ -5,7 +5,7 @@ use tui::{
     prelude::*,
     style::{Color, Modifier, Style},
     widgets::{
-        scrollbar, Block, BorderType, Borders, Gauge, List, ListItem, Padding, Paragraph,
+        scrollbar, Block, BorderType, Borders, Clear, Gauge, List, ListItem, Padding, Paragraph,
         Scrollbar, Wrap,
     },
     Frame,
@@ -30,6 +30,39 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
 }
 
 fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {}
+
+fn render_keybinds_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
+    let area = centered_rect((5, 9), (5, 9), area);
+
+    let block = Block::default()
+        .title("Keybinds")
+        .borders(Borders::ALL)
+        .border_style(app.config.theme().overlay())
+        .border_type(BorderType::Plain)
+        .style(app.config.theme().overlay())
+        .padding(Padding {
+            top: 1,
+            bottom: 1,
+            left: 2,
+            right: 2,
+        });
+    let lines = vec![
+        Line::from("j/k   scroll down/up"),
+        Line::from("h/l   focus previous/next panel"),
+        Line::from("Tab   cycle panels"),
+        Line::from("Ent   select current"),
+        Line::from("Esc   deselect current"),
+        Line::from("r     refresh all feeds"),
+        Line::from("q     quit"),
+        Line::from("o     open feed/item in browser"),
+        Line::from(",     open config file in default editor"),
+        Line::from("?     toggle this help dialog"),
+    ];
+    let keybinds = Paragraph::new(lines).block(block);
+
+    frame.render_widget(Clear, area);
+    frame.render_widget(keybinds, area);
+}
 
 fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
     let chunks = Layout::default()
@@ -193,7 +226,7 @@ fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: R
                 .margin(2)
                 .split(chunks[2]);
 
-            let title = Paragraph::new(detail.title().unwrap_or("[empty]"))
+            let title = Paragraph::new(detail.title().unwrap_or("[no title]"))
                 .style(Style::default().add_modifier(Modifier::ITALIC))
                 .wrap(Wrap { trim: true })
                 .alignment(Alignment::Center);
@@ -201,9 +234,10 @@ fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: R
             let author = Paragraph::new(detail.author().unwrap_or("[anonymous]"))
                 .alignment(Alignment::Center);
 
-            let date = Paragraph::new(detail.pub_date().unwrap_or("")).alignment(Alignment::Center);
+            let date = Paragraph::new(detail.pub_date().unwrap_or("[no date]"))
+                .alignment(Alignment::Center);
 
-            let body = Paragraph::new(detail.description().unwrap_or("[empty]"))
+            let body = Paragraph::new(detail.description().unwrap_or("[no content]"))
                 .wrap(Wrap { trim: true })
                 .block(Block::default().padding(Padding {
                     top: 0,
@@ -278,19 +312,26 @@ fn render_main_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: R
             );
         }
     }
+
+    if app.show_keybinds {
+        render_keybinds_area(app, frame, frame.size());
+    }
 }
 
 fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
     match app.load_state {
         LoadState::Loading((n, count)) => {
-            frame.render_widget(
-                Gauge::default()
-                    .ratio(n as f64 / count as f64)
-                    .label(format!("Loading {}/{}", n, count))
-                    .use_unicode(true)
-                    .gauge_style(app.config.theme().base()),
-                area,
-            );
+            if count > 0 {
+                frame.render_widget(
+                    Gauge::default()
+                        .ratio(n as f64 / count as f64)
+                        .label(format!("Loading {}/{}", n, count))
+                        .use_unicode(true)
+                        .style(app.config.theme().status())
+                        .gauge_style(app.config.theme().status()),
+                    area,
+                );
+            }
         }
         LoadState::Done => {
             let text = match app.current_feed().cloned() {
@@ -306,7 +347,7 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
                 Block::default()
                     .title_alignment(Alignment::Center)
                     .title(text)
-                    .style(app.config.theme().base()),
+                    .style(app.config.theme().status()),
                 area,
             );
         }
@@ -315,9 +356,38 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
                 Block::default()
                     .title_alignment(Alignment::Center)
                     .title("ERROR")
-                    .style(app.config.theme().base()),
+                    .style(app.config.theme().status()),
                 area,
             );
         }
     }
+}
+
+fn centered_rect(ratio_x: (u32, u32), ratio_y: (u32, u32), r: Rect) -> Rect {
+    let each_x = (ratio_x.1 - ratio_x.0) / 2;
+    let each_y = (ratio_y.1 - ratio_y.0) / 2;
+
+    let popup_layout = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints(
+            [
+                Constraint::Ratio(each_y, ratio_y.1),
+                Constraint::Ratio(ratio_y.0, ratio_y.1),
+                Constraint::Ratio(each_y, ratio_y.1),
+            ]
+            .as_ref(),
+        )
+        .split(r);
+
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints(
+            [
+                Constraint::Ratio(each_x, ratio_x.1),
+                Constraint::Ratio(ratio_x.0, ratio_x.1),
+                Constraint::Ratio(each_x, ratio_x.1),
+            ]
+            .as_ref(),
+        )
+        .split(popup_layout[1])[1]
 }

@@ -12,6 +12,19 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         }
     }
 
+    if app.show_keybinds {
+        match key_event.code {
+            // Exit application on `q`
+            KeyCode::Char('q') | KeyCode::Char('Q') => {
+                app.quit();
+            }
+            _ => {
+                app.toggle_keybinds();
+                return Ok(());
+            }
+        }
+    }
+
     match key_event.code {
         // Exit application on `q`
         KeyCode::Char('q') | KeyCode::Char('Q') => {
@@ -51,6 +64,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         }
         KeyCode::Char('r') => {
             app.refresh_all();
+        }
+        KeyCode::Char('?') => {
+            app.toggle_keybinds();
         }
         KeyCode::Char(',') => {
             app.open_config();

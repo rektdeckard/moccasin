@@ -13,6 +13,7 @@ mod theme;
 const DEFAULT_CONFIG_FILE: &'static str = "tabss.toml";
 const DEFAULT_DB_FILE: &'static str = "tabss.db";
 const DEFAULT_REFRESH_INTERVAL: u64 = 300;
+const DEFAULT_REFRESH_TIMEOUT: u64 = 5;
 
 #[derive(Debug, Default, Clone)]
 pub struct Config {
@@ -21,6 +22,7 @@ pub struct Config {
     feed_urls: Vec<String>,
     sort_order: SortOrder,
     refresh_interval: u64,
+    refresh_timeout: u64,
     theme: theme::Theme,
 }
 
@@ -113,6 +115,10 @@ impl Config {
         self.refresh_interval
     }
 
+    pub fn refresh_timeout(&self) -> u64 {
+        self.refresh_timeout
+    }
+
     fn read_from_toml(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
         let toml = fs::read_to_string(&file_path)?;
         let table = toml.parse::<Table>()?;
@@ -137,12 +143,14 @@ impl Config {
         };
 
         // TODO: load from args if present
-        let theme = preferences
-            .and_then(|prefs| {
+        let theme = args
+            .color_scheme
+            .and_then(|scheme| theme::Theme::from_str(&scheme).ok())
+            .or(preferences.and_then(|prefs| {
                 prefs
                     .get("color_scheme")
                     .and_then(|scheme| theme::Theme::try_from(scheme).ok())
-            })
+            }))
             .unwrap_or_default();
 
         let sort_order: SortOrder = preferences
@@ -154,12 +162,37 @@ impl Config {
             })
             .unwrap_or_default();
 
+        let refresh_interval = args
+            .interval
+            .or_else(|| {
+                preferences.and_then(|prefs| {
+                    prefs.get("refresh_interval").and_then(|i| match i {
+                        Value::Integer(i) => Some(*i as u64),
+                        _ => None,
+                    })
+                })
+            })
+            .unwrap_or(DEFAULT_REFRESH_INTERVAL);
+
+        let refresh_timeout = args
+            .timeout
+            .or_else(|| {
+                preferences.and_then(|prefs| {
+                    prefs.get("refresh_timeout").and_then(|i| match i {
+                        Value::Integer(i) => Some(*i as u64),
+                        _ => None,
+                    })
+                })
+            })
+            .unwrap_or(DEFAULT_REFRESH_INTERVAL);
+
         Ok(Self {
             file_path,
             dir_path,
             feed_urls: feeds,
             sort_order,
-            refresh_interval: args.interval.unwrap_or(DEFAULT_REFRESH_INTERVAL),
+            refresh_interval,
+            refresh_timeout,
             theme,
         })
     }

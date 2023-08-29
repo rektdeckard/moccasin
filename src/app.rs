@@ -12,17 +12,21 @@ use tui::widgets::{ListState, ScrollbarState};
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 pub struct Args {
-    /// Sets a custom config file
+    /// Set a custom config file
     #[arg(short, long)]
     pub config: Option<String>,
 
-    /// Sets a custom theme, either built-in or a path to a theme file
-    #[arg(short, long)]
-    pub theme: Option<String>,
+    /// Set a custom theme, either built-in or a path to a theme file
+    #[arg(short = 's', long)]
+    pub color_scheme: Option<String>,
 
-    /// Sets a custom refresh rate in seconds
+    /// Set a custom refresh rate in seconds
     #[arg(short, long)]
     pub interval: Option<u64>,
+
+    /// Set a custom request timeout in seconds
+    #[arg(short, long)]
+    pub timeout: Option<u64>,
 }
 
 /// Application result type.
@@ -49,6 +53,7 @@ pub struct App {
     pub detail_scroll: ScrollbarState,
     pub detail_scroll_index: u16,
     pub load_state: LoadState,
+    pub show_keybinds: bool,
     dimensions: (u16, u16),
     rx: UnboundedReceiver<StorageEvent>,
 }
@@ -77,6 +82,7 @@ impl App {
             detail_scroll: ScrollbarState::default(),
             detail_scroll_index: 0,
             load_state: LoadState::Done,
+            show_keybinds: false,
             rx,
         })
     }
@@ -214,10 +220,17 @@ impl App {
         }
 
         if let Some(next_view) = match self.active_view {
-            ActiveView::Feeds => Some(ActiveView::Items),
+            ActiveView::Feeds => {
+                if self.items.state.selected().is_none() {
+                    self.next_item();
+                }
+                Some(ActiveView::Items)
+            }
             ActiveView::Items => {
                 if has_current_item {
                     Some(ActiveView::Detail)
+                } else if wrap {
+                    Some(ActiveView::Feeds)
                 } else {
                     None
                 }
@@ -247,6 +260,8 @@ impl App {
             ActiveView::Feeds => {
                 if wrap && has_current_item {
                     Some(ActiveView::Detail)
+                } else if wrap {
+                    Some(ActiveView::Items)
                 } else {
                     None
                 }
@@ -334,10 +349,14 @@ impl App {
         let _ = self.repo.refresh_all(&self.config);
     }
 
+    pub fn toggle_keybinds(&mut self) {
+        self.show_keybinds = !self.show_keybinds;
+    }
+
     fn set_feeds(&mut self, feeds: Vec<Feed>) {
         self.feeds.items = feeds;
-        self.items.state.select(None);
-        self.active_view = ActiveView::Feeds;
+        // self.items.state.select(None);
+        // self.active_view = ActiveView::Feeds;
     }
 
     fn reset_items_scroll(&mut self) {

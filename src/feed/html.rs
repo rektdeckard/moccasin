@@ -73,7 +73,15 @@ fn flatten_html(node: &Node) -> Result<Option<String>, HTMLParseError> {
                     Ok(Some(parts))
                 }
             }
-            // "img" => Ok(Some("[image] ".into())),
+            // "img" => {
+            //     if let Some(href) = el.attributes.get("src") {
+            //         Ok(Some(
+            //             format!("\n\n[image]({})\n\n", href.as_deref().unwrap_or_default()).into(),
+            //         ))
+            //     } else {
+            //         Ok(None)
+            //     }
+            // }
             _ => Ok(None),
         },
     }

@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::error::Error;
 use std::fmt;
+use std::{error::Error, str::FromStr};
 use toml::Value;
 use tui::style::{Color, Modifier, Style, Stylize};
 
@@ -45,6 +45,8 @@ fn make_color(c: &str) -> Color {
 #[derive(Debug, Clone)]
 pub struct Theme {
     base: Style,
+    overlay: Option<Style>,
+    status: Option<Style>,
     selection: Option<Style>,
     selection_active: Option<Style>,
     border: Option<Style>,
@@ -55,6 +57,14 @@ pub struct Theme {
 impl Theme {
     pub fn base(&self) -> Style {
         self.base.clone()
+    }
+
+    pub fn overlay(&self) -> Style {
+        self.overlay.unwrap_or(self.base).clone()
+    }
+
+    pub fn status(&self) -> Style {
+        self.status.unwrap_or(self.base()).clone()
     }
 
     pub fn selection(&self) -> Style {
@@ -121,6 +131,8 @@ impl Theme {
 
         Self {
             base: Style::default().fg(white).bg(midnight),
+            overlay: Some(Style::default().fg(midnight).bg(gray)),
+            status: Some(Style::default().fg(gray).bg(midnight)),
             border: Some(Style::default().fg(gray)),
             border_active: Some(Style::default().fg(white)),
             selection: Some(Style::default().fg(midnight).bg(gray)),
@@ -129,13 +141,86 @@ impl Theme {
         }
     }
 
+    pub fn focus() -> Self {
+        Self {
+            base: Style::default().on_black(),
+            overlay: Some(Style::default().reversed()),
+            status: None,
+            border: Some(Style::default().black().on_black()),
+            border_active: Some(Style::default().on_black()),
+            selection: None,
+            selection_active: Some(Style::default().reversed()),
+            scrollbar: Some(Style::default().on_black()),
+        }
+    }
+
+    pub fn gruvbox() -> Self {
+        let s_dark0_hard = "#1d2021";
+        let s_dark0 = "#282828";
+        let s_dark0_soft = "#32302f";
+        let s_dark1 = "#3c3836";
+        let s_dark2 = "#504945";
+        let s_dark3 = "#665c54";
+        let s_dark4 = "#7c6f64";
+        let s_dark4_256 = "#7c6f64";
+
+        let s_gray_245 = "#928374";
+        let s_gray_244 = "#928374";
+
+        let s_light0_hard = "#f9f5d7";
+        let s_light0 = "#fbf1c7";
+        let s_light0_soft = "#f2e5bc";
+        let s_light1 = "#ebdbb2";
+        let s_light2 = "#d5c4a1";
+        let s_light3 = "#bdae93";
+        let s_light4 = "#a89984";
+        let s_light4_256 = "#a89984";
+
+        let s_bright_red = "#fb4934";
+        let s_bright_green = "#b8bb26";
+        let s_bright_yellow = "#fabd2f";
+        let s_bright_blue = "#83a598";
+        let s_bright_purple = "#d3869b";
+        let s_bright_aqua = "#8ec07c";
+        let s_bright_orange = "#fe8019";
+
+        let s_neutral_red = "#cc241d";
+        let s_neutral_green = "#98971a";
+        let s_neutral_yellow = "#d79921";
+        let s_neutral_blue = "#458588";
+        let s_neutral_purple = "#b16286";
+        let s_neutral_aqua = "#689d6a";
+        let s_neutral_orange = "#d65d0e";
+
+        let s_faded_red = "#9d0006";
+        let s_faded_green = "#79740e";
+        let s_faded_yellow = "#b57614";
+        let s_faded_blue = "#076678";
+        let s_faded_purple = "#8f3f71";
+        let s_faded_aqua = "#427b58";
+        let s_faded_orange = "#af3a03";
+
+        Self {
+            base: Default::default(),
+            overlay: None,
+            status: None,
+            border: None,
+            border_active: Some(Style::default().green()),
+            selection: None,
+            selection_active: None,
+            scrollbar: None,
+        }
+    }
+
     pub fn jungle() -> Self {
         Self {
             base: Default::default(),
-            selection_active: Some(Style::default().green().reversed()),
+            overlay: None,
+            status: None,
+            border: Some(Style::default().dim()),
             border_active: Some(Style::default().green()),
             selection: Some(Style::default().dim().reversed()),
-            border: Some(Style::default().dim()),
+            selection_active: Some(Style::default().green().reversed()),
             scrollbar: Some(Style::default().dim()),
         }
     }
@@ -147,6 +232,8 @@ impl Theme {
 
         Self {
             base: Style::default().fg(bright_green).bg(dark_green),
+            overlay: None,
+            status: None,
             border: Some(Style::default().fg(mid_green)),
             border_active: Some(Style::default().fg(bright_green)),
             selection: Some(Style::default().fg(dark_green).bg(mid_green)),
@@ -158,6 +245,8 @@ impl Theme {
     pub fn redshift() -> Self {
         Self {
             base: Style::default().red().on_black(),
+            overlay: None,
+            status: None,
             selection_active: Some(Style::default().red().reversed()),
             border_active: Some(Style::default().red()),
             selection: Some(Style::default().dim().reversed()),
@@ -173,6 +262,8 @@ impl Theme {
 
         Self {
             base: Style::default().fg(bright_amber).bg(black),
+            overlay: None,
+            status: None,
             border: Some(Style::default().fg(dark_amber)),
             border_active: Some(Style::default().fg(bright_amber)),
             selection: Some(Style::default().fg(black).bg(dark_amber)),
@@ -186,11 +277,38 @@ impl Default for Theme {
     fn default() -> Self {
         Self {
             base: Style::default(),
+            overlay: None,
+            status: None,
             selection_active: None,
             selection: None,
             border_active: None,
             border: None,
             scrollbar: Some(Style::default().dim()),
+        }
+    }
+}
+
+impl FromStr for Theme {
+    type Err = ParseThemeError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "default" => Ok(Self::default()),
+            "borland" => Ok(Self::borland()),
+            "focus" => Ok(Self::focus()),
+            "jungle" => Ok(Self::jungle()),
+            "matrix" => Ok(Self::matrix()),
+            "redshift" => Ok(Self::redshift()),
+            "wyse" => Ok(Self::wyse()),
+            file => {
+                if std::path::Path::new(file).exists() {
+                    let contents = std::fs::read_to_string(file).or(Err(ParseThemeError))?;
+                    let table = contents.parse::<Value>().or(Err(ParseThemeError))?;
+                    Self::try_from(&table).or(Err(ParseThemeError))
+                } else {
+                    Err(ParseThemeError)
+                }
+            }
         }
     }
 }
@@ -203,6 +321,7 @@ impl TryFrom<&toml::Value> for Theme {
             toml::Value::String(name) => match name.as_str() {
                 "default" => Ok(Self::default()),
                 "borland" => Ok(Self::borland()),
+                "focus" => Ok(Self::focus()),
                 "jungle" => Ok(Self::jungle()),
                 "matrix" => Ok(Self::matrix()),
                 "redshift" => Ok(Self::redshift()),
@@ -222,6 +341,12 @@ impl TryFrom<&toml::Value> for Theme {
                     .get("base")
                     .and_then(|v| try_style_from_toml(v).ok())
                     .unwrap_or_default(),
+                overlay: scheme
+                    .get("overlay")
+                    .and_then(|v| try_style_from_toml(v).ok()),
+                status: scheme
+                    .get("status")
+                    .and_then(|v| try_style_from_toml(v).ok()),
                 selection_active: scheme
                     .get("selection_active")
                     .and_then(|v| try_style_from_toml(v).ok()),

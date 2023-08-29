@@ -3,6 +3,7 @@ use crate::feed::Feed;
 use anyhow::Result;
 use polodb_core::{bson, bson::doc, Database};
 use std::fmt::Debug;
+use std::time::Duration;
 use tokio::sync::mpsc::{self, UnboundedSender};
 
 #[derive(Clone, Debug)]
@@ -111,7 +112,12 @@ impl Repository {
         let _ = app_tx.send(StorageEvent::Requesting(count));
 
         tokio::spawn(async move {
-            let futures: Vec<_> = urls.into_iter().map(reqwest::get).collect();
+            let client = reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(config.refresh_interval()))
+                .timeout(Duration::from_secs(config.refresh_interval()))
+                .build()
+                .expect("failed to build client");
+            let futures: Vec<_> = urls.into_iter().map(|url| client.get(url).send()).collect();
             let handles: Vec<_> = futures
                 .into_iter()
                 .enumerate()
@@ -121,24 +127,12 @@ impl Repository {
                         let res = match req.await {
                             Ok(res) => match res.bytes().await {
                                 Ok(bytes) => match Feed::read_from(&bytes[..]) {
-                                    Ok(feed) => {
-                                        // panic!("{:?}", feed);
-                                        Ok(feed)
-                                    }
-                                    Err(_) => {
-                                        // panic!("parse");
-                                        Err(FetchErr::Parse)
-                                    }
+                                    Ok(feed) => Ok(feed),
+                                    Err(_) => Err(FetchErr::Parse),
                                 },
-                                Err(_) => {
-                                    // panic!("deserialize");
-                                    Err(FetchErr::Deserialize)
-                                }
+                                Err(_) => Err(FetchErr::Deserialize),
                             },
-                            Err(_) => {
-                                // panic!("fetch");
-                                Err(FetchErr::Request)
-                            }
+                            Err(_) => Err(FetchErr::Request),
                         };
                         let _ = app_tx.send(StorageEvent::Fetched((n, count)));
                         res
