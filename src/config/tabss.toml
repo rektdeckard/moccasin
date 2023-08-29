@@ -4,7 +4,11 @@
 
 [sources]
 # List URLs for Atom or RSS feeds here
-feeds = ["https://feeds.feedburner.com/brainpickings/rss"]
+feeds = [
+    "https://feeds.feedburner.com/brainpickings/rss",
+    "https://feeds.simplecast.com/dLRotFGk",
+    "https://alistapart.com/main/feed/",
+]
 
 [preferences]
 # The TUI color scheme, either a built-in scheme name:

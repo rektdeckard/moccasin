@@ -62,7 +62,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Char('c') | KeyCode::Char('C') if key_event.modifiers == KeyModifiers::CONTROL => {
             app.quit();
         }
-        // Arrow handlers
+        // Navigation handlers
         KeyCode::Down | KeyCode::Char('j') => {
             app.next();
         }
@@ -81,6 +81,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::BackTab => {
             app.prev_tab();
         }
+        KeyCode::Char('b') => app.set_tab(0),
+        KeyCode::Char('f') => app.set_tab(1),
+        KeyCode::Char('t') => app.set_tab(2),
         // Other handlers you could add here.
         KeyCode::Esc => {
             app.unselect();
