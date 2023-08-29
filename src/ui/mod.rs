@@ -45,19 +45,30 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
 }
 
 fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
-    let tabs = Tabs::new(vec![
-        Tab::Browse.to_string(),
-        Tab::Favorites.to_string(),
-        Tab::Tags.to_string(),
-    ])
-    .block(
-        Block::default()
-            .style(app.config.theme().status())
-            .borders(Borders::BOTTOM)
-            .border_style(app.config.theme().active_border()),
-    )
-    .select(app.active_tab.index_of())
-    .highlight_style(app.config.theme().selection());
+    let browse = Tab::Browse.to_string().clone();
+    let (b, rowse) = browse.split_at(1);
+    let b = b.underlined().to_owned();
+    let browse = Line::from(vec![b, rowse.reset()]);
+
+    let favorites = Tab::Favorites.to_string().clone();
+    let (f, avorites) = favorites.split_at(1);
+    let f = f.underlined().to_owned();
+    let favorites = Line::from(vec![f, avorites.reset()]);
+
+    let tags = Tab::Tags.to_string().clone();
+    let (t, ags) = tags.split_at(1);
+    let t = t.underlined().to_owned();
+    let tags = Line::from(vec![t, ags.reset()]);
+
+    let tabs = Tabs::new(vec![browse, favorites, tags])
+        .block(
+            Block::default()
+                .style(app.config.theme().status())
+                .borders(Borders::BOTTOM)
+                .border_style(app.config.theme().active_border()),
+        )
+        .select(app.active_tab.index_of())
+        .highlight_style(app.config.theme().selection());
     frame.render_widget(tabs, area);
 }
 
@@ -77,17 +88,18 @@ fn render_keybinds_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, are
             right: 2,
         });
     let lines = vec![
-        Line::from("j/k   scroll down/up"),
-        Line::from("h/l   focus previous/next panel"),
-        Line::from("Tab   cycle panels"),
-        Line::from("Ent   select current"),
-        Line::from("Esc   deselect current"),
-        Line::from("a     add a feed"),
-        Line::from("r     refresh all feeds"),
-        Line::from("q     quit"),
-        Line::from("o     open feed/item in browser"),
-        Line::from(",     open config file in default editor"),
-        Line::from("?     toggle this help dialog"),
+        Line::from("j/k    scroll down/up"),
+        Line::from("h/l    focus previous/next panel"),
+        Line::from("Ent    select current"),
+        Line::from("Esc    deselect current"),
+        Line::from("Tab    cycle tabs"),
+        Line::from("b/f/t  go to Browse/Favorites/Tags tab"),
+        Line::from("a      add a feed"),
+        Line::from("r      refresh all feeds"),
+        Line::from("q      quit"),
+        Line::from("o      open feed/item in browser"),
+        Line::from(",      open config file in default editor"),
+        Line::from("?      toggle this help dialog"),
     ];
     let keybinds = Paragraph::new(lines).block(block);
 

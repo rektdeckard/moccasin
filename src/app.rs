@@ -363,6 +363,10 @@ impl App {
         self.active_tab = prev_tab;
     }
 
+    pub fn set_tab(&mut self, index: usize) {
+        self.active_tab = Tab::from(index);
+    }
+
     pub fn unselect(&mut self) {
         if self.current_item().is_some() {
             self.items.state.select(None);
@@ -537,6 +541,16 @@ impl Tab {
             Self::Browse => 0,
             Self::Favorites => 1,
             Self::Tags => 2,
+        }
+    }
+}
+
+impl From<usize> for Tab {
+    fn from(value: usize) -> Self {
+        match value {
+            1 => Tab::Favorites,
+            2 => Tab::Tags,
+            _ => Tab::Browse,
         }
     }
 }
