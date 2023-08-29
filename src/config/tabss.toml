@@ -18,10 +18,13 @@ feeds = ["https://feeds.feedburner.com/brainpickings/rss"]
 #     [preferences.color_scheme]
 #     name = "borland"
 #     base = { fg = "#FFFFFF", bg = "#000080" }
+#     overlay = { fg = "#000080", bg = "#bbbbbb" }
+#     status = { fg = "#bbbbbb", bg = "#000080" }
 #     border = "#bbbbbb"
-#     active_border = "#FFFFFF"
+#     border_active = "#FFFFFF"
 #     selection = { fg = "#000080", bg = "#bbbbbb" }
-#     active_selection = { fg = "#000080", bg = "#fefd72" }
+#     selection_active = { fg = "#000080", bg = "#fefd72" }
+#     scrollbar = { fg = "#FFFFFF", bg = "#bbbbbb" }
 color_scheme = "default"
 
 # The default sort order of feeds in the left panel, one of:

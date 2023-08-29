@@ -166,7 +166,7 @@ impl Theme {
         Self {
             base: Style::default().fg(brightWhite).bg(background),
             overlay: Some(Style::default().fg(background).bg(brightBlue)),
-            status: Some(Style::default().fg(brightYellow)),
+            status: Some(Style::default().fg(brightYellow).bg(background)),
             border: Some(Style::default().fg(brightBlack)),
             border_active: Some(Style::default().fg(brightYellow)),
             selection: Some(Style::default().fg(background).bg(brightYellow)),
@@ -177,14 +177,14 @@ impl Theme {
 
     pub fn focus() -> Self {
         Self {
-            base: Style::default().on_dark_gray(),
+            base: Style::default().on_black(),
             overlay: Some(Style::default().reversed()),
             status: None,
-            border: Some(Style::default().dark_gray().on_dark_gray()),
+            border: Some(Style::default().black().on_black()),
             border_active: Some(Style::default()),
             selection: None,
             selection_active: Some(Style::default().reversed()),
-            scrollbar: Some(Style::default().on_dark_gray()),
+            scrollbar: Some(Style::default().on_black()),
         }
     }
 
@@ -325,11 +325,11 @@ impl TryFrom<&toml::Value> for Theme {
                 status: scheme
                     .get("status")
                     .and_then(|v| try_style_from_toml(v).ok()),
-                selection_active: scheme
-                    .get("selection_active")
-                    .and_then(|v| try_style_from_toml(v).ok()),
                 selection: scheme
                     .get("selection")
+                    .and_then(|v| try_style_from_toml(v).ok()),
+                selection_active: scheme
+                    .get("selection_active")
                     .and_then(|v| try_style_from_toml(v).ok()),
                 border: scheme
                     .get("border")
