@@ -12,6 +12,33 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         }
     }
 
+    // println!("{:?}", app.add_feed_state);
+    if app.should_render_feed_input() {
+        match key_event.code {
+            KeyCode::Char('c') | KeyCode::Char('C') if key_event.modifiers == KeyModifiers::CONTROL => {
+                app.quit();
+            }
+            KeyCode::Enter => app.submit_message(),
+            KeyCode::Char(to_insert) => {
+                app.enter_char(to_insert);
+            }
+            KeyCode::Backspace => {
+                app.delete_char();
+            }
+            KeyCode::Left => {
+                app.move_cursor_left();
+            }
+            KeyCode::Right => {
+                app.move_cursor_right();
+            }
+            KeyCode::Esc => {
+                app.toggle_add_feed();
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
     if app.show_keybinds {
         match key_event.code {
             // Exit application on `q`
@@ -58,6 +85,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         // Other handlers you could add here.
         KeyCode::Esc => {
             app.unselect();
+        }
+        KeyCode::Char('a') => {
+            app.toggle_add_feed();
         }
         KeyCode::Char('o') => {
             app.open();

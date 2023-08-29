@@ -9,8 +9,10 @@ use tokio::sync::mpsc::{self, UnboundedSender};
 #[derive(Clone, Debug)]
 pub enum StorageEvent {
     RetrievedAll(Vec<Feed>),
+    RetrievedOne(Feed),
     Requesting(usize),
     Fetched((usize, usize)),
+    Errored,
 }
 
 #[derive(Debug)]
@@ -103,9 +105,41 @@ impl Repository {
         Ok(())
     }
 
+    pub fn add_feed_by_url(&mut self, url: &str, config: &Config) {
+        let url = url.to_owned();
+        let app_tx = self.app_tx.clone();
+        let interval = config.refresh_interval();
+
+        let _ = app_tx.send(StorageEvent::Requesting(1));
+
+        let _ = tokio::spawn(async move {
+            let client = reqwest::Client::builder()
+                .connect_timeout(Duration::from_secs(interval))
+                .timeout(Duration::from_secs(interval))
+                .build()
+                .expect("failed to build client");
+
+            if let Ok(feed) = match client.get(url).send().await {
+                Ok(res) => match res.bytes().await {
+                    Ok(bytes) => match Feed::read_from(&bytes[..]) {
+                        Ok(feed) => Ok(feed),
+                        Err(_) => Err(FetchErr::Parse),
+                    },
+                    Err(_) => Err(FetchErr::Deserialize),
+                },
+                Err(_) => Err(FetchErr::Request),
+            } {
+                let _ = app_tx.send(StorageEvent::Fetched((1, 1)));
+                let _ = app_tx.send(StorageEvent::RetrievedOne(feed));
+            } else {
+                let _ = app_tx.send(StorageEvent::Errored);
+            }
+        });
+    }
+
     pub fn refresh_all(&mut self, config: &Config) {
         let app_tx = self.app_tx.clone();
-        let config = config.clone();
+        let config: Config = config.clone();
         let urls = config.feed_urls().clone();
         let count = urls.len();
 

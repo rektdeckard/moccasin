@@ -119,6 +119,29 @@ impl Config {
         self.refresh_timeout
     }
 
+    pub fn write_config(&self) -> Result<()> {
+        todo!();
+        // let toml = fs::read_to_string(&self.file_path)?;
+        // let toml = toml.parse::<Table>()?;
+        // match toml.get("sources") {
+        //     Some(Value::Table(sources)) => match sources.get("feeds") {
+        //         Some(Value::Array(feeds)) => {
+        //             *feeds = self.feed_urls.into();
+        //         },
+        //         _ => {}
+        //     }
+        //     _ => {}
+        // }
+        // let feeds = sources.get("feeds")?;
+        // let file = fs::write(self.file_path, contents);
+    }
+
+    pub fn add_feed_url(&mut self, url: &str) -> Result<()> {
+        self.feed_urls.push(url.into());
+        // self.write_config()
+        Ok(())
+    }
+
     fn read_from_toml(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
         let toml = fs::read_to_string(&file_path)?;
         let table = toml.parse::<Table>()?;

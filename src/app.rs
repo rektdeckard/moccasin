@@ -54,6 +54,7 @@ pub struct App {
     pub detail_scroll_index: u16,
     pub load_state: LoadState,
     pub show_keybinds: bool,
+    pub add_feed_state: InputState,
     dimensions: (u16, u16),
     rx: UnboundedReceiver<StorageEvent>,
 }
@@ -83,6 +84,7 @@ impl App {
             detail_scroll_index: 0,
             load_state: LoadState::Done,
             show_keybinds: false,
+            add_feed_state: InputState::new(),
             rx,
         })
     }
@@ -109,6 +111,32 @@ impl App {
                         let _ = self.repo.store_all(&feeds);
                         self.set_feeds(feeds);
                         self.load_state = LoadState::Done;
+                    }
+                    Some(StorageEvent::RetrievedOne(feed)) => {
+                        match self
+                            .feeds
+                            .items
+                            .iter()
+                            .enumerate()
+                            .find(|(_, f)| f.link() == feed.link())
+                        {
+                            Some((i, f)) => {
+                                self.feeds.items[i] = f.clone();
+                            }
+                            None => {
+                                self.feeds.items.push(feed);
+                            }
+                        }
+
+                        match self.load_state {
+                            LoadState::Loading(_) => {
+                                self.load_state = LoadState::Done;
+                            }
+                            _ => {}
+                        }
+                    }
+                    Some(StorageEvent::Errored) => {
+                        self.load_state = LoadState::Errored;
                     }
                     None => {
                         break;
@@ -140,6 +168,10 @@ impl App {
 
     pub fn should_render_detail_scroll(&self) -> bool {
         false
+    }
+
+    pub fn should_render_feed_input(&self) -> bool {
+        self.add_feed_state.show_input
     }
 
     pub fn current_feed(&self) -> Option<&Feed> {
@@ -353,6 +385,72 @@ impl App {
         self.show_keybinds = !self.show_keybinds;
     }
 
+    pub fn toggle_add_feed(&mut self) {
+        self.add_feed_state.input.clear();
+        self.reset_cursor();
+        self.add_feed_state.show_input = !self.add_feed_state.show_input;
+    }
+
+    pub fn move_cursor_left(&mut self) {
+        let cursor_moved_left = self.add_feed_state.cursor_position.saturating_sub(1);
+        self.add_feed_state.cursor_position = self.clamp_cursor(cursor_moved_left);
+    }
+
+    pub fn move_cursor_right(&mut self) {
+        let cursor_moved_right = self.add_feed_state.cursor_position.saturating_add(1);
+        self.add_feed_state.cursor_position = self.clamp_cursor(cursor_moved_right);
+    }
+
+    pub fn enter_char(&mut self, new_char: char) {
+        self.add_feed_state
+            .input
+            .insert(self.add_feed_state.cursor_position, new_char);
+        self.move_cursor_right();
+    }
+
+    pub fn delete_char(&mut self) {
+        let is_not_cursor_leftmost = self.add_feed_state.cursor_position != 0;
+        if is_not_cursor_leftmost {
+            // Method "remove" is not used on the saved text for deleting the selected char.
+            // Reason: Using remove on String works on bytes instead of the chars.
+            // Using remove would require special care because of char boundaries.
+
+            let current_index = self.add_feed_state.cursor_position;
+            let from_left_to_current_index = current_index - 1;
+
+            // Getting all characters before the selected character.
+            let before_char_to_delete = self
+                .add_feed_state
+                .input
+                .chars()
+                .take(from_left_to_current_index);
+            // Getting all characters after selected character.
+            let after_char_to_delete = self.add_feed_state.input.chars().skip(current_index);
+
+            // Put all characters together except the selected one.
+            // By leaving the selected one out, it is forgotten and therefore deleted.
+            self.add_feed_state.input = before_char_to_delete.chain(after_char_to_delete).collect();
+            self.move_cursor_left();
+        }
+    }
+
+    fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
+        new_cursor_pos.clamp(0, self.add_feed_state.input.len())
+    }
+
+    fn reset_cursor(&mut self) {
+        self.add_feed_state.cursor_position = 0;
+    }
+
+    pub fn submit_message(&mut self) {
+        self.config.add_feed_url(&self.add_feed_state.input);
+        self.repo
+            .add_feed_by_url(&self.add_feed_state.input, &self.config);
+        self.add_feed_state.input.clear();
+        self.reset_cursor();
+        self.toggle_add_feed();
+    }
+
     fn set_feeds(&mut self, feeds: Vec<Feed>) {
         self.feeds.items = feeds;
         // self.items.state.select(None);
@@ -451,5 +549,22 @@ impl<T> StatefulList<T> {
 
     pub fn items(&self) -> &Vec<T> {
         &self.items
+    }
+}
+
+#[derive(Debug)]
+pub struct InputState {
+    pub input: String,
+    pub cursor_position: usize,
+    show_input: bool,
+}
+
+impl InputState {
+    fn new() -> Self {
+        Self {
+            input: String::new(),
+            cursor_position: 0,
+            show_input: false,
+        }
     }
 }

@@ -141,74 +141,50 @@ impl Theme {
         }
     }
 
-    pub fn focus() -> Self {
+    pub fn darcula() -> Self {
+        let background = make_color("#242424");
+        let black = make_color("#000000");
+        let blue = make_color("#6796E6");
+        let brightBlack = make_color("#707070");
+        let brightBlue = make_color("#7A9EC2");
+        let brightCyan = make_color("#5B9D9D");
+        let brightGreen = make_color("#6A8759");
+        let brightPurple = make_color("#9E7BB0");
+        let brightRed = make_color("#CC8242");
+        let brightWhite = make_color("#CCCCCC");
+        let brightYellow = make_color("#CD9731");
+        let cursorColor = make_color("#CCCCCC");
+        let cyan = make_color("#0B929D");
+        let foreground = make_color("#CCCCCC");
+        let green = make_color("#A5C261");
+        let purple = make_color("#B267E6");
+        let red = make_color("#CC6E2F");
+        let selectionBackground = make_color("#FFFFFF");
+        let white = make_color("#F2F2F2");
+        let yellow = make_color("#FFC66D");
+
         Self {
-            base: Style::default().on_black(),
-            overlay: Some(Style::default().reversed()),
-            status: None,
-            border: Some(Style::default().black().on_black()),
-            border_active: Some(Style::default().on_black()),
-            selection: None,
-            selection_active: Some(Style::default().reversed()),
-            scrollbar: Some(Style::default().on_black()),
+            base: Style::default().fg(brightWhite).bg(background),
+            overlay: Some(Style::default().fg(background).bg(brightBlue)),
+            status: Some(Style::default().fg(brightYellow)),
+            border: Some(Style::default().fg(brightBlack)),
+            border_active: Some(Style::default().fg(brightYellow)),
+            selection: Some(Style::default().fg(background).bg(brightYellow)),
+            selection_active: Some(Style::default().fg(background).bg(yellow)),
+            scrollbar: Some(Style::default().fg(brightBlack)),
         }
     }
 
-    pub fn gruvbox() -> Self {
-        let s_dark0_hard = "#1d2021";
-        let s_dark0 = "#282828";
-        let s_dark0_soft = "#32302f";
-        let s_dark1 = "#3c3836";
-        let s_dark2 = "#504945";
-        let s_dark3 = "#665c54";
-        let s_dark4 = "#7c6f64";
-        let s_dark4_256 = "#7c6f64";
-
-        let s_gray_245 = "#928374";
-        let s_gray_244 = "#928374";
-
-        let s_light0_hard = "#f9f5d7";
-        let s_light0 = "#fbf1c7";
-        let s_light0_soft = "#f2e5bc";
-        let s_light1 = "#ebdbb2";
-        let s_light2 = "#d5c4a1";
-        let s_light3 = "#bdae93";
-        let s_light4 = "#a89984";
-        let s_light4_256 = "#a89984";
-
-        let s_bright_red = "#fb4934";
-        let s_bright_green = "#b8bb26";
-        let s_bright_yellow = "#fabd2f";
-        let s_bright_blue = "#83a598";
-        let s_bright_purple = "#d3869b";
-        let s_bright_aqua = "#8ec07c";
-        let s_bright_orange = "#fe8019";
-
-        let s_neutral_red = "#cc241d";
-        let s_neutral_green = "#98971a";
-        let s_neutral_yellow = "#d79921";
-        let s_neutral_blue = "#458588";
-        let s_neutral_purple = "#b16286";
-        let s_neutral_aqua = "#689d6a";
-        let s_neutral_orange = "#d65d0e";
-
-        let s_faded_red = "#9d0006";
-        let s_faded_green = "#79740e";
-        let s_faded_yellow = "#b57614";
-        let s_faded_blue = "#076678";
-        let s_faded_purple = "#8f3f71";
-        let s_faded_aqua = "#427b58";
-        let s_faded_orange = "#af3a03";
-
+    pub fn focus() -> Self {
         Self {
-            base: Default::default(),
-            overlay: None,
+            base: Style::default().on_dark_gray(),
+            overlay: Some(Style::default().reversed()),
             status: None,
-            border: None,
-            border_active: Some(Style::default().green()),
+            border: Some(Style::default().dark_gray().on_dark_gray()),
+            border_active: Some(Style::default()),
             selection: None,
-            selection_active: None,
-            scrollbar: None,
+            selection_active: Some(Style::default().reversed()),
+            scrollbar: Some(Style::default().on_dark_gray()),
         }
     }
 
@@ -295,6 +271,7 @@ impl FromStr for Theme {
         match s {
             "default" => Ok(Self::default()),
             "borland" => Ok(Self::borland()),
+            "darcula" => Ok(Self::darcula()),
             "focus" => Ok(Self::focus()),
             "jungle" => Ok(Self::jungle()),
             "matrix" => Ok(Self::matrix()),
@@ -321,6 +298,7 @@ impl TryFrom<&toml::Value> for Theme {
             toml::Value::String(name) => match name.as_str() {
                 "default" => Ok(Self::default()),
                 "borland" => Ok(Self::borland()),
+                "darcula" => Ok(Self::darcula()),
                 "focus" => Ok(Self::focus()),
                 "jungle" => Ok(Self::jungle()),
                 "matrix" => Ok(Self::matrix()),
