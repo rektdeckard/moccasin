@@ -11,7 +11,7 @@ Type " -c ./src/config/tabss.toml"
 Sleep 1s
 Enter
 Show
-Sleep 1s
+Sleep 2s
 
 Down
 Sleep 2500ms
