@@ -51,6 +51,9 @@ fn sort_feeds(feeds: &mut Vec<Feed>, config: &Config) {
                 a_index.cmp(&b_index)
             })
         }
+        SortOrder::Unread => {
+            unimplemented!()
+        }
         SortOrder::Newest => feeds.sort_by(|a, b| a.last_fetched().cmp(&b.last_fetched())),
         SortOrder::Oldest => feeds.sort_by(|a, b| b.last_fetched().cmp(&a.last_fetched())),
     }
@@ -110,7 +113,7 @@ impl Repository {
     pub fn store_all(&self, feeds: &Vec<Feed>) -> anyhow::Result<()> {
         let collection = self.db.collection::<Feed>("feeds");
         for feed in feeds {
-            let query = doc! {  "link": feed.link() };
+            let query = doc! { "link": feed.link() };
             let update = bson::to_document(feed)?;
 
             match collection.find_one(query.clone()) {
@@ -157,6 +160,11 @@ impl Repository {
                 let _ = app_tx.send(StorageEvent::Errored);
             }
         });
+    }
+
+    pub fn remove_feed_by_url(&mut self, url: &str, config: &Config) {
+        let collection = self.db.collection::<Feed>("feeds");
+        let _ = collection.delete_one(doc! { "link": url });
     }
 
     pub fn refresh_all(&mut self, config: &Config) {

@@ -1,14 +1,8 @@
-use html_parser::{Dom, DomVariant, Element};
+use html_parser::Dom;
 use tui::layout::Alignment;
 use tui::prelude::*;
-use tui::style::{Modifier, Style};
-use tui::text::StyledGrapheme;
-use tui::widgets::{
-    // reflow::{LineComposer, LineTruncator, WordWrapper},
-    Block,
-    Widget,
-    Wrap,
-};
+use tui::style::Style;
+use tui::widgets::{Block, Wrap};
 
 fn get_line_offset(line_width: u16, text_area_width: u16, alignment: Alignment) -> u16 {
     match alignment {

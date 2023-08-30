@@ -5,8 +5,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{fs, fs::File};
-use toml::{toml, Table, Value};
-use toml_edit::{value, Document};
+use toml::{Table, Value};
 
 mod theme;
 
@@ -32,6 +31,7 @@ pub enum SortOrder {
     #[default]
     Az,
     Za,
+    Unread,
     Newest,
     Oldest,
     Custom,
@@ -164,6 +164,12 @@ impl Config {
         Ok(())
     }
 
+    pub fn remove_feed_url(&mut self, url: &str) -> Result<()> {
+        self.feed_urls.retain(|u| u != url);
+        // self.write_config()
+        Ok(())
+    }
+
     fn read_from_toml(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
         let toml = fs::read_to_string(&file_path)?;
         let table = toml.parse::<Table>()?;
@@ -229,7 +235,7 @@ impl Config {
                     })
                 })
             })
-            .unwrap_or(DEFAULT_REFRESH_INTERVAL);
+            .unwrap_or(DEFAULT_REFRESH_TIMEOUT);
 
         let cache_control = if args.no_cache {
             CacheControl::Never

@@ -1,4 +1,4 @@
-use tui::style::{Style, Styled};
+use tui::style::Styled;
 use tui::widgets::Block;
 
 pub trait Themed<'a, T>

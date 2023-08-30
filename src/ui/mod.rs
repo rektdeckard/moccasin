@@ -1,13 +1,9 @@
-use crate::app::{App, LoadState, Tab, View};
+use crate::app::{App, Status, Tab};
 use tui::{
     backend::Backend,
     layout::Alignment,
     prelude::*,
-    style::{Color, Modifier, Style},
-    widgets::{
-        scrollbar, Block, BorderType, Borders, Clear, Gauge, List, ListItem, Padding, Paragraph,
-        Scrollbar, Tabs, Wrap,
-    },
+    widgets::{Block, BorderType, Borders, Clear, Gauge, Padding, Paragraph, Tabs},
     Frame,
 };
 
@@ -38,9 +34,7 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
     render_status_bar(app, frame, wrapper[2]);
 
     if app.show_keybinds {
-        render_keybinds_area(app, frame, frame.size());
-    } else if app.should_render_feed_input() {
-        render_input_feed_area(app, frame, frame.size())
+        render_keybinds_overlay(app, frame, frame.size());
     }
 }
 
@@ -72,7 +66,7 @@ fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Re
     frame.render_widget(tabs, area);
 }
 
-fn render_keybinds_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
+fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
     let area = centered_rect_ratio((5, 9), (5, 9), area);
 
     let block = Block::default()
@@ -107,24 +101,19 @@ fn render_keybinds_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, are
     frame.render_widget(keybinds, area);
 }
 
-fn render_input_feed_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
-    let area = centered_rect_sized(60, 3, area);
-
+fn render_console_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
     let block = Block::default()
-        .title("Add feed URL")
-        .borders(Borders::ALL)
-        .border_style(app.config.theme().overlay())
-        .border_type(BorderType::Plain)
-        .style(app.config.theme().overlay());
+        .style(app.config.theme().status())
+        .borders(Borders::TOP)
+        .border_style(app.config.theme().active_border());
 
-    let input_field = Paragraph::new(app.add_feed_state.input.as_str()).block(block);
+    let input_field = Paragraph::new(app.command_state.input.as_str()).block(block);
 
-    frame.render_widget(Clear, area);
     frame.render_widget(input_field, area);
     frame.set_cursor(
         // Draw the cursor at the current position in the input field.
         // This position is can be controlled via the left and right arrow key
-        area.x + app.add_feed_state.cursor_position as u16 + 1,
+        area.x + app.command_state.cursor_position as u16,
         // Move one line down, from the border to the input line
         area.y + 1,
     )
@@ -136,44 +125,48 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
         .borders(Borders::TOP)
         .border_style(app.config.theme().active_border());
 
-    match app.load_state {
-        LoadState::Loading(n, count) => {
-            if count > 0 {
+    if app.should_render_console() {
+        render_console_area(app, frame, area)
+    } else {
+        match app.status {
+            Status::Loading(n, count) => {
+                if count > 0 {
+                    frame.render_widget(
+                        Gauge::default()
+                            .block(block)
+                            .ratio(n as f64 / count as f64)
+                            .label(format!("Loading {}/{}", n, count))
+                            .use_unicode(true)
+                            .gauge_style(app.config.theme().status()),
+                        area,
+                    );
+                }
+            }
+            Status::Done => {
+                let text = match app.current_feed().cloned() {
+                    Some(feed) => {
+                        let mut message = String::from("Last fetched: ");
+                        let date = feed.last_fetched().unwrap_or("never").into();
+                        message.push_str(date);
+                        message
+                    }
+                    _ => "[no selection]".to_string(),
+                };
                 frame.render_widget(
-                    Gauge::default()
-                        .block(block)
-                        .ratio(n as f64 / count as f64)
-                        .label(format!("Loading {}/{}", n, count))
-                        .use_unicode(true)
-                        .gauge_style(app.config.theme().status()),
+                    Paragraph::new(text)
+                        .alignment(Alignment::Center)
+                        .block(block),
                     area,
                 );
             }
-        }
-        LoadState::Done => {
-            let text = match app.current_feed().cloned() {
-                Some(feed) => {
-                    let mut message = String::from("Last fetched: ");
-                    let date = feed.last_fetched().unwrap_or("never").into();
-                    message.push_str(date);
-                    message
-                }
-                _ => "[no selection]".to_string(),
-            };
-            frame.render_widget(
-                Paragraph::new(text)
-                    .alignment(Alignment::Center)
-                    .block(block),
-                area,
-            );
-        }
-        LoadState::Errored => {
-            frame.render_widget(
-                Paragraph::new("ERROR")
-                    .alignment(Alignment::Center)
-                    .block(block),
-                area,
-            );
+            Status::Errored => {
+                frame.render_widget(
+                    Paragraph::new("ERROR")
+                        .alignment(Alignment::Center)
+                        .block(block),
+                    area,
+                );
+            }
         }
     }
 }

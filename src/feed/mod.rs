@@ -1,5 +1,5 @@
 use anyhow;
-use chrono::{DateTime, FixedOffset};
+use chrono::prelude::*;
 use rss::{Channel, Item as ChannelItem};
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
@@ -50,7 +50,7 @@ impl Feed {
     pub fn read_from<R: BufRead>(reader: R) -> anyhow::Result<Feed> {
         let channel = Channel::read_from(reader)?;
         let mut feed = Feed::from(channel);
-        feed.last_fetched = Some(DateTime::<FixedOffset>::default().to_rfc2822());
+        feed.last_fetched = Some(Local::now().to_rfc2822());
         Ok(feed)
     }
 }
