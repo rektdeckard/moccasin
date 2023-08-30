@@ -1,9 +1,19 @@
 [package]
-name = "tabss"
+name = "moccasin"
 version = "0.1.0"
 edition = "2021"
+authors = ["Tobias Fried <friedtm@gmail.com>"]
+license = "MIT"
+description = "A tool to search files"
+readme = "README.md"
+homepage = "https://github.com/rektdeckard/moccasin"
+repository = "https://github.com/rektdeckard/moccasin"
+keywords = ["rss", "atom", "feed reader", "tui"]
+categories = ["command-line-utilities"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[[bin]]
+name = "mcsn"
+path = "src/main.rs"
 
 [dependencies]
 anyhow = "1"

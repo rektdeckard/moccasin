@@ -5,9 +5,9 @@ Set Padding 32
 Set Width 1600
 Set Height 800
 
-Type "tabss"
+Type "mcsn"
 Hide
-Type " -c ./src/config/tabss.toml"
+Type " -c ./src/config/moccasin.toml"
 Sleep 1s
 Enter
 Show

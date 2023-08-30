@@ -137,7 +137,7 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
         .border_style(app.config.theme().active_border());
 
     match app.load_state {
-        LoadState::Loading((n, count)) => {
+        LoadState::Loading(n, count) => {
             if count > 0 {
                 frame.render_widget(
                     Gauge::default()

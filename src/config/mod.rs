@@ -10,8 +10,8 @@ use toml_edit::{value, Document};
 
 mod theme;
 
-const DEFAULT_CONFIG_FILE: &'static str = "tabss.toml";
-const DEFAULT_DB_FILE: &'static str = "tabss.db";
+const DEFAULT_CONFIG_FILE: &'static str = "moccasin.toml";
+const DEFAULT_DB_FILE: &'static str = "moccasin.db";
 const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 const DEFAULT_REFRESH_TIMEOUT: u64 = 5;
 
@@ -86,7 +86,7 @@ impl Config {
             let dir_path = file_path.parent().expect("could not find config directory");
             (dir_path.into(), file_path.into())
         } else {
-            let dir_path = ProjectDirs::from("com", "rektsoft", "tabss")
+            let dir_path = ProjectDirs::from("com", "rektsoft", "moccasin")
                 .unwrap()
                 .config_local_dir()
                 .to_owned();
@@ -260,7 +260,7 @@ impl Config {
         fs::create_dir_all(&dir_path)?;
         let cfg_path = Path::new(dir_path.as_path()).join(DEFAULT_CONFIG_FILE);
         let mut file = File::create(&cfg_path)?;
-        let stub = include_str!("tabss.toml").parse::<Table>()?;
+        let stub = include_str!("moccasin.toml").parse::<Table>()?;
         let feed_urls = stub["sources"]["feeds"]
             .as_array()
             .expect("parse default feeds")

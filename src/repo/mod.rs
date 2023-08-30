@@ -130,7 +130,7 @@ impl Repository {
     pub fn add_feed_by_url(&mut self, url: &str, config: &Config) {
         let url = url.to_owned();
         let app_tx = self.app_tx.clone();
-        let interval = config.refresh_interval();
+        let interval = config.refresh_timeout();
 
         let _ = app_tx.send(StorageEvent::Requesting(1));
 
@@ -169,8 +169,8 @@ impl Repository {
 
         tokio::spawn(async move {
             let client = reqwest::Client::builder()
-                .connect_timeout(Duration::from_secs(config.refresh_interval()))
-                .timeout(Duration::from_secs(config.refresh_interval()))
+                .connect_timeout(Duration::from_secs(config.refresh_timeout()))
+                .timeout(Duration::from_secs(config.refresh_timeout()))
                 .build()
                 .expect("failed to build client");
             let futures: Vec<_> = urls.into_iter().map(|url| client.get(url).send()).collect();

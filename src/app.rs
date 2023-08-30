@@ -38,7 +38,7 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 #[derive(Debug)]
 pub enum LoadState {
-    Loading((usize, usize)),
+    Loading(usize, usize),
     Errored,
     Done,
 }
@@ -108,14 +108,19 @@ impl App {
             match self.rx.poll_recv(&mut cx) {
                 Poll::Ready(m) => match m {
                     Some(StorageEvent::Requesting(amount)) => {
-                        self.load_state = LoadState::Loading((0, amount));
+                        self.load_state = match self.load_state {
+                            LoadState::Loading(curr, total) => {
+                                LoadState::Loading(curr, total + amount)
+                            }
+                            _ => LoadState::Loading(0, amount),
+                        };
                     }
                     Some(StorageEvent::Fetched(counts)) => {
                         let counts = match self.load_state {
-                            LoadState::Loading((current, total)) => (current + 1, total),
+                            LoadState::Loading(current, total) => ((current + 1).min(total), total),
                             _ => counts,
                         };
-                        self.load_state = LoadState::Loading(counts);
+                        self.load_state = LoadState::Loading(counts.0, counts.1);
                     }
                     Some(StorageEvent::RetrievedAll(feeds)) => {
                         if self.config.should_cache() {
@@ -145,7 +150,7 @@ impl App {
                         }
 
                         match self.load_state {
-                            LoadState::Loading(_) => {
+                            LoadState::Loading(_, _) => {
                                 self.load_state = LoadState::Done;
                             }
                             _ => {}
