@@ -5,6 +5,7 @@
 [sources]
 # List URLs for Atom or RSS feeds here
 feeds = [
+    "https://bigthink.com/feed/all/",
     "https://feeds.feedburner.com/brainpickings/rss",
     "https://feeds.simplecast.com/dLRotFGk",
     "https://alistapart.com/main/feed/",
@@ -37,6 +38,9 @@ color_scheme = "default"
 # where "custom" is the order listed in [sources.feeds], and "unread" is sorted
 # first by unread, then by newest.
 sort_feeds = "a-z"
+
+# Whether or not to cache feeds in a local file-backed database
+cache_feeds = true
 
 # How often to refresh feeds, in seconds.
 # The default is 300, and 0 means refresh will only occur on startup.

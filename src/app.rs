@@ -27,6 +27,10 @@ pub struct Args {
     /// Set a custom request timeout in seconds
     #[arg(short, long)]
     pub timeout: Option<u64>,
+
+    /// Do not cache feeds in local file-backed database
+    #[arg(short, long)]
+    pub no_cache: bool,
 }
 
 /// Application result type.
@@ -68,7 +72,11 @@ impl App {
         let (tx, rx) = mpsc::unbounded_channel::<StorageEvent>();
         let mut repo = Repository::init(&config, tx).await?;
 
-        let items = repo.get_all_from_db(&config)?;
+        let items = if config.should_cache() {
+            repo.get_all_from_db(&config)?
+        } else {
+            Vec::new()
+        };
         repo.refresh_all(&config);
 
         Ok(Self {
@@ -110,11 +118,17 @@ impl App {
                         self.load_state = LoadState::Loading(counts);
                     }
                     Some(StorageEvent::RetrievedAll(feeds)) => {
-                        let _ = self.repo.store_all(&feeds);
+                        if self.config.should_cache() {
+                            self.repo.store_all(&feeds);
+                        }
                         self.set_feeds(feeds);
                         self.load_state = LoadState::Done;
                     }
                     Some(StorageEvent::RetrievedOne(feed)) => {
+                        if self.config.should_cache() {
+                            self.repo.store_one(&feed);
+                        }
+
                         match self
                             .feeds
                             .items

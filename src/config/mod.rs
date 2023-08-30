@@ -21,12 +21,13 @@ pub struct Config {
     dir_path: PathBuf,
     feed_urls: Vec<String>,
     sort_order: SortOrder,
+    cache_control: CacheControl,
     refresh_interval: u64,
     refresh_timeout: u64,
     theme: theme::Theme,
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum SortOrder {
     #[default]
     Az,
@@ -34,6 +35,23 @@ pub enum SortOrder {
     Newest,
     Oldest,
     Custom,
+}
+
+#[derive(Debug, Default, Clone, PartialEq)]
+pub enum CacheControl {
+    #[default]
+    Always,
+    Never,
+}
+
+impl From<bool> for CacheControl {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Always
+        } else {
+            Self::Never
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -109,6 +127,10 @@ impl Config {
 
     pub fn sort_order(&self) -> &SortOrder {
         &self.sort_order
+    }
+
+    pub fn should_cache(&self) -> bool {
+        self.cache_control == CacheControl::Always
     }
 
     pub fn refresh_interval(&self) -> u64 {
@@ -187,7 +209,7 @@ impl Config {
 
         let refresh_interval = args
             .interval
-            .or_else(|| {
+            .or({
                 preferences.and_then(|prefs| {
                     prefs.get("refresh_interval").and_then(|i| match i {
                         Value::Integer(i) => Some(*i as u64),
@@ -199,7 +221,7 @@ impl Config {
 
         let refresh_timeout = args
             .timeout
-            .or_else(|| {
+            .or({
                 preferences.and_then(|prefs| {
                     prefs.get("refresh_timeout").and_then(|i| match i {
                         Value::Integer(i) => Some(*i as u64),
@@ -209,11 +231,25 @@ impl Config {
             })
             .unwrap_or(DEFAULT_REFRESH_INTERVAL);
 
+        let cache_control = if args.no_cache {
+            CacheControl::Never
+        } else {
+            preferences
+                .and_then(|prefs| {
+                    prefs.get("cache_feeds").and_then(|i| match i {
+                        Value::Boolean(b) => Some(CacheControl::from(*b)),
+                        _ => None,
+                    })
+                })
+                .unwrap_or(CacheControl::Always)
+        };
+
         Ok(Self {
             file_path,
             dir_path,
             feed_urls: feeds,
             sort_order,
+            cache_control,
             refresh_interval,
             refresh_timeout,
             theme,

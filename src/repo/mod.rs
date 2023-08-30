@@ -58,7 +58,11 @@ fn sort_feeds(feeds: &mut Vec<Feed>, config: &Config) {
 
 impl Repository {
     pub async fn init(config: &Config, app_tx: UnboundedSender<StorageEvent>) -> Result<Self> {
-        let db = Database::open_file(config.db_path()).expect("could not open db");
+        let db = if config.should_cache() {
+            Database::open_file(config.db_path()).expect("could not open db")
+        } else {
+            Database::open_memory().expect("could not open db")
+        };
 
         let (db_tx, db_rx) = mpsc::unbounded_channel::<StorageEvent>();
 
@@ -83,6 +87,24 @@ impl Repository {
 
         sort_feeds(&mut feeds, config);
         Ok(feeds)
+    }
+
+    pub fn store_one(&self, feed: &Feed) -> Result<(), polodb_core::Error> {
+        let collection = self.db.collection::<Feed>("feeds");
+        let query = doc! {  "link": feed.link() };
+        let update = bson::to_document(feed)?;
+
+        match collection.find_one(query.clone()) {
+            Ok(Some(_)) => {
+                collection.update_one(query, update)?;
+                Ok(())
+            }
+            Ok(None) => {
+                collection.insert_one(feed)?;
+                Ok(())
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub fn store_all(&self, feeds: &Vec<Feed>) -> anyhow::Result<()> {
