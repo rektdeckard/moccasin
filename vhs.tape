@@ -54,8 +54,6 @@ Sleep 250ms
 Down
 Sleep 250ms
 Down
-Sleep 250ms
-Down
 Sleep 500ms
 Right
 Sleep 500ms
