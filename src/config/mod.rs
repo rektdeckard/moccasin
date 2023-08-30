@@ -5,13 +5,12 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{fs, fs::File};
-use toml::{toml, Table, Value};
-use toml_edit::{value, Document};
+use toml::{Table, Value};
 
 mod theme;
 
-const DEFAULT_CONFIG_FILE: &'static str = "tabss.toml";
-const DEFAULT_DB_FILE: &'static str = "tabss.db";
+const DEFAULT_CONFIG_FILE: &'static str = "moccasin.toml";
+const DEFAULT_DB_FILE: &'static str = "moccasin.db";
 const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 const DEFAULT_REFRESH_TIMEOUT: u64 = 5;
 
@@ -32,6 +31,7 @@ pub enum SortOrder {
     #[default]
     Az,
     Za,
+    Unread,
     Newest,
     Oldest,
     Custom,
@@ -86,7 +86,7 @@ impl Config {
             let dir_path = file_path.parent().expect("could not find config directory");
             (dir_path.into(), file_path.into())
         } else {
-            let dir_path = ProjectDirs::from("com", "rektsoft", "tabss")
+            let dir_path = ProjectDirs::from("com", "rektsoft", "moccasin")
                 .unwrap()
                 .config_local_dir()
                 .to_owned();
@@ -164,6 +164,12 @@ impl Config {
         Ok(())
     }
 
+    pub fn remove_feed_url(&mut self, url: &str) -> Result<()> {
+        self.feed_urls.retain(|u| u != url);
+        // self.write_config()
+        Ok(())
+    }
+
     fn read_from_toml(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
         let toml = fs::read_to_string(&file_path)?;
         let table = toml.parse::<Table>()?;
@@ -229,7 +235,7 @@ impl Config {
                     })
                 })
             })
-            .unwrap_or(DEFAULT_REFRESH_INTERVAL);
+            .unwrap_or(DEFAULT_REFRESH_TIMEOUT);
 
         let cache_control = if args.no_cache {
             CacheControl::Never
@@ -260,7 +266,7 @@ impl Config {
         fs::create_dir_all(&dir_path)?;
         let cfg_path = Path::new(dir_path.as_path()).join(DEFAULT_CONFIG_FILE);
         let mut file = File::create(&cfg_path)?;
-        let stub = include_str!("tabss.toml").parse::<Table>()?;
+        let stub = include_str!("moccasin.toml").parse::<Table>()?;
         let feed_urls = stub["sources"]["feeds"]
             .as_array()
             .expect("parse default feeds")

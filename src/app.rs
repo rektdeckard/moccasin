@@ -5,6 +5,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::error;
 use std::process::{Child, Command, Stdio};
+use std::str::FromStr;
 use std::task::Poll;
 use tokio::sync::mpsc::{self, UnboundedReceiver};
 use tui::widgets::{ListState, ScrollbarState};
@@ -37,10 +38,55 @@ pub struct Args {
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
 #[derive(Debug)]
-pub enum LoadState {
-    Loading((usize, usize)),
+pub enum Status {
+    Loading(usize, usize),
     Errored,
     Done,
+}
+
+#[derive(Debug)]
+pub enum ConsoleCommand {
+    AddFeed(String),
+    DeleteFeed(Option<String>),
+    Search(String),
+}
+
+#[derive(Debug)]
+pub enum ConsoleCommandError {
+    BadCommand,
+    BadArgument,
+}
+
+impl FromStr for ConsoleCommand {
+    type Err = ConsoleCommandError;
+
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
+        let parts = s.split_whitespace().collect::<Vec<_>>();
+
+        if let Some(cmd) = parts.get(0) {
+            match *cmd {
+                ":a" | ":add" => match parts.get(1) {
+                    Some(url) => Ok(ConsoleCommand::AddFeed(url.to_string())),
+                    None => Err(ConsoleCommandError::BadArgument),
+                },
+                ":s" | ":search" => {
+                    let query = parts.iter().skip(1).copied().collect::<String>();
+                    if query.is_empty() {
+                        Err(ConsoleCommandError::BadArgument)
+                    } else {
+                        Ok(ConsoleCommand::Search(query))
+                    }
+                }
+                ":d" | ":delete" => match parts.get(1) {
+                    Some(url) => Ok(ConsoleCommand::DeleteFeed(Some(url.to_string()))),
+                    None => Ok(ConsoleCommand::DeleteFeed(None)),
+                },
+                _ => Err(ConsoleCommandError::BadCommand),
+            }
+        } else {
+            Err(ConsoleCommandError::BadCommand)
+        }
+    }
 }
 
 /// Application.
@@ -57,9 +103,9 @@ pub struct App {
     pub items_scroll: ScrollbarState,
     pub detail_scroll: ScrollbarState,
     pub detail_scroll_index: u16,
-    pub load_state: LoadState,
     pub show_keybinds: bool,
-    pub add_feed_state: InputState,
+    pub status: Status,
+    pub command_state: InputState,
     dimensions: (u16, u16),
     rx: UnboundedReceiver<StorageEvent>,
 }
@@ -92,9 +138,9 @@ impl App {
             items_scroll: ScrollbarState::default(),
             detail_scroll: ScrollbarState::default(),
             detail_scroll_index: 0,
-            load_state: LoadState::Done,
+            status: Status::Done,
             show_keybinds: false,
-            add_feed_state: InputState::new(),
+            command_state: InputState::new(),
             rx,
         })
     }
@@ -108,21 +154,24 @@ impl App {
             match self.rx.poll_recv(&mut cx) {
                 Poll::Ready(m) => match m {
                     Some(StorageEvent::Requesting(amount)) => {
-                        self.load_state = LoadState::Loading((0, amount));
+                        self.status = match self.status {
+                            Status::Loading(curr, total) => Status::Loading(curr, total + amount),
+                            _ => Status::Loading(0, amount),
+                        };
                     }
                     Some(StorageEvent::Fetched(counts)) => {
-                        let counts = match self.load_state {
-                            LoadState::Loading((current, total)) => (current + 1, total),
+                        let counts = match self.status {
+                            Status::Loading(current, total) => ((current + 1).min(total), total),
                             _ => counts,
                         };
-                        self.load_state = LoadState::Loading(counts);
+                        self.status = Status::Loading(counts.0, counts.1);
                     }
                     Some(StorageEvent::RetrievedAll(feeds)) => {
                         if self.config.should_cache() {
                             self.repo.store_all(&feeds);
                         }
                         self.set_feeds(feeds);
-                        self.load_state = LoadState::Done;
+                        self.status = Status::Done;
                     }
                     Some(StorageEvent::RetrievedOne(feed)) => {
                         if self.config.should_cache() {
@@ -144,15 +193,15 @@ impl App {
                             }
                         }
 
-                        match self.load_state {
-                            LoadState::Loading(_) => {
-                                self.load_state = LoadState::Done;
+                        match self.status {
+                            Status::Loading(_, _) => {
+                                self.status = Status::Done;
                             }
                             _ => {}
                         }
                     }
                     Some(StorageEvent::Errored) => {
-                        self.load_state = LoadState::Errored;
+                        self.status = Status::Errored;
                     }
                     None => {
                         break;
@@ -186,8 +235,8 @@ impl App {
         false
     }
 
-    pub fn should_render_feed_input(&self) -> bool {
-        self.add_feed_state.show_input
+    pub fn should_render_console(&self) -> bool {
+        self.command_state.show_input
     }
 
     pub fn current_feed(&self) -> Option<&Feed> {
@@ -425,70 +474,95 @@ impl App {
         self.show_keybinds = !self.show_keybinds;
     }
 
-    pub fn toggle_add_feed(&mut self) {
-        self.add_feed_state.input.clear();
-        self.reset_cursor();
-        self.add_feed_state.show_input = !self.add_feed_state.show_input;
+    pub fn toggle_console(&mut self, cmd: Option<&str>) {
+        if let Some(cmd) = cmd {
+            self.command_state.input = cmd.into();
+            self.command_state.cursor_position = self.clamp_cursor(cmd.len());
+        } else {
+            self.command_state.input.clear();
+            self.reset_cursor();
+        }
+        self.command_state.show_input = !self.command_state.show_input;
     }
 
     pub fn move_cursor_left(&mut self) {
-        let cursor_moved_left = self.add_feed_state.cursor_position.saturating_sub(1);
-        self.add_feed_state.cursor_position = self.clamp_cursor(cursor_moved_left);
+        let cursor_moved_left = self.command_state.cursor_position.saturating_sub(1);
+        self.command_state.cursor_position = self.clamp_cursor(cursor_moved_left);
     }
 
     pub fn move_cursor_right(&mut self) {
-        let cursor_moved_right = self.add_feed_state.cursor_position.saturating_add(1);
-        self.add_feed_state.cursor_position = self.clamp_cursor(cursor_moved_right);
+        let cursor_moved_right = self.command_state.cursor_position.saturating_add(1);
+        self.command_state.cursor_position = self.clamp_cursor(cursor_moved_right);
     }
 
     pub fn enter_char(&mut self, new_char: char) {
-        self.add_feed_state
+        self.command_state
             .input
-            .insert(self.add_feed_state.cursor_position, new_char);
+            .insert(self.command_state.cursor_position, new_char);
         self.move_cursor_right();
     }
 
     pub fn delete_char(&mut self) {
-        let is_not_cursor_leftmost = self.add_feed_state.cursor_position != 0;
+        let is_not_cursor_leftmost = self.command_state.cursor_position != 0;
         if is_not_cursor_leftmost {
             // Method "remove" is not used on the saved text for deleting the selected char.
             // Reason: Using remove on String works on bytes instead of the chars.
             // Using remove would require special care because of char boundaries.
 
-            let current_index = self.add_feed_state.cursor_position;
+            let current_index = self.command_state.cursor_position;
             let from_left_to_current_index = current_index - 1;
 
             // Getting all characters before the selected character.
             let before_char_to_delete = self
-                .add_feed_state
+                .command_state
                 .input
                 .chars()
                 .take(from_left_to_current_index);
             // Getting all characters after selected character.
-            let after_char_to_delete = self.add_feed_state.input.chars().skip(current_index);
+            let after_char_to_delete = self.command_state.input.chars().skip(current_index);
 
             // Put all characters together except the selected one.
             // By leaving the selected one out, it is forgotten and therefore deleted.
-            self.add_feed_state.input = before_char_to_delete.chain(after_char_to_delete).collect();
+            self.command_state.input = before_char_to_delete.chain(after_char_to_delete).collect();
             self.move_cursor_left();
         }
     }
 
     fn clamp_cursor(&self, new_cursor_pos: usize) -> usize {
-        new_cursor_pos.clamp(0, self.add_feed_state.input.len())
+        new_cursor_pos.clamp(0, self.command_state.input.len())
     }
 
     fn reset_cursor(&mut self) {
-        self.add_feed_state.cursor_position = 0;
+        self.command_state.cursor_position = 0;
     }
 
-    pub fn submit_message(&mut self) {
-        self.config.add_feed_url(&self.add_feed_state.input);
-        self.repo
-            .add_feed_by_url(&self.add_feed_state.input, &self.config);
-        self.add_feed_state.input.clear();
+    pub fn submit_command(&mut self) {
+        match self.command_state.input.parse::<ConsoleCommand>() {
+            Ok(ConsoleCommand::AddFeed(url)) => {
+                self.config.add_feed_url(&url);
+                self.repo.add_feed_by_url(&url, &self.config);
+            }
+            Ok(ConsoleCommand::DeleteFeed(maybe_url)) => {
+                if let Some(url) =
+                    maybe_url.or(self.current_feed().and_then(|f| Some(f.link().into())))
+                {
+                    self.config.remove_feed_url(&url);
+                    self.repo.remove_feed_by_url(&url, &self.config);
+
+                    // TODO: refactor, this is so bad
+                    self.feeds.items.retain(|u| u.link() != url);
+                    self.feeds.state.select(None);
+                    self.reset_items_scroll();
+                    self.reset_detail_scroll();
+                }
+            }
+            Ok(ConsoleCommand::Search(_)) => todo!(),
+            _ => self.status = Status::Errored,
+        }
+
+        self.command_state.input.clear();
         self.reset_cursor();
-        self.toggle_add_feed();
+        self.toggle_console(None);
     }
 
     fn set_feeds(&mut self, feeds: Vec<Feed>) {

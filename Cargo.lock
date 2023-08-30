@@ -1052,6 +1052,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "moccasin"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "chrono",
+ "clap",
+ "colorsys",
+ "crossterm 0.27.0",
+ "directories",
+ "futures",
+ "html-escape",
+ "html_parser",
+ "polodb_core",
+ "ratatui",
+ "reqwest",
+ "rss",
+ "serde",
+ "tokio",
+ "toml",
+ "toml_edit",
+]
+
+[[package]]
 name = "native-tls"
 version = "0.2.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1762,29 +1785,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "unicode-ident",
-]
-
-[[package]]
-name = "tabss"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "chrono",
- "clap",
- "colorsys",
- "crossterm 0.27.0",
- "directories",
- "futures",
- "html-escape",
- "html_parser",
- "polodb_core",
- "ratatui",
- "reqwest",
- "rss",
- "serde",
- "tokio",
- "toml",
- "toml_edit",
 ]
 
 [[package]]

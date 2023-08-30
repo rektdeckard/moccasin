@@ -1,5 +1,5 @@
-# tabss config
-# This file may be modified by tabss when changes are made via software,
+# moccasin config
+# This file may be modified by moccasin when changes are made via software,
 # E.G. importing OPML files or individual feeds and changing colorschemes.
 
 [sources]

@@ -7,7 +7,9 @@ use tui::style::{Color, Modifier, Style, Stylize};
 #[derive(Debug)]
 enum ParseColorError {
     InvalidFormat,
+    #[allow(dead_code)]
     InvalidDigit,
+    #[allow(dead_code)]
     Empty,
 }
 
@@ -143,35 +145,21 @@ impl Theme {
 
     pub fn darcula() -> Self {
         let background = make_color("#242424");
-        let black = make_color("#000000");
-        let blue = make_color("#6796E6");
-        let brightBlack = make_color("#707070");
-        let brightBlue = make_color("#7A9EC2");
-        let brightCyan = make_color("#5B9D9D");
-        let brightGreen = make_color("#6A8759");
-        let brightPurple = make_color("#9E7BB0");
-        let brightRed = make_color("#CC8242");
-        let brightWhite = make_color("#CCCCCC");
-        let brightYellow = make_color("#CD9731");
-        let cursorColor = make_color("#CCCCCC");
-        let cyan = make_color("#0B929D");
-        let foreground = make_color("#CCCCCC");
-        let green = make_color("#A5C261");
-        let purple = make_color("#B267E6");
-        let red = make_color("#CC6E2F");
-        let selectionBackground = make_color("#FFFFFF");
-        let white = make_color("#F2F2F2");
+        let bright_black = make_color("#707070");
+        let bright_blue = make_color("#7A9EC2");
+        let bright_white = make_color("#CCCCCC");
+        let bright_yellow = make_color("#CD9731");
         let yellow = make_color("#FFC66D");
 
         Self {
-            base: Style::default().fg(brightWhite).bg(background),
-            overlay: Some(Style::default().fg(background).bg(brightBlue)),
-            status: Some(Style::default().fg(brightYellow).bg(background)),
-            border: Some(Style::default().fg(brightBlack)),
-            border_active: Some(Style::default().fg(brightYellow)),
-            selection: Some(Style::default().fg(background).bg(brightYellow)),
+            base: Style::default().fg(bright_white).bg(background),
+            overlay: Some(Style::default().fg(background).bg(bright_blue)),
+            status: Some(Style::default().fg(bright_yellow).bg(background)),
+            border: Some(Style::default().fg(bright_black)),
+            border_active: Some(Style::default().fg(bright_yellow)),
+            selection: Some(Style::default().fg(background).bg(bright_yellow)),
             selection_active: Some(Style::default().fg(background).bg(yellow)),
-            scrollbar: Some(Style::default().fg(brightBlack)),
+            scrollbar: Some(Style::default().fg(bright_black)),
         }
     }
 

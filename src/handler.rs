@@ -12,14 +12,14 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         }
     }
 
-    if app.should_render_feed_input() {
+    if app.should_render_console() {
         match key_event.code {
             KeyCode::Char('c') | KeyCode::Char('C')
                 if key_event.modifiers == KeyModifiers::CONTROL =>
             {
                 app.quit();
             }
-            KeyCode::Enter => app.submit_message(),
+            KeyCode::Enter => app.submit_command(),
             KeyCode::Char(to_insert) => {
                 app.enter_char(to_insert);
             }
@@ -33,7 +33,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 app.move_cursor_right();
             }
             KeyCode::Esc => {
-                app.toggle_add_feed();
+                app.toggle_console(None);
             }
             _ => {}
         }
@@ -89,7 +89,16 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             app.unselect();
         }
         KeyCode::Char('a') => {
-            app.toggle_add_feed();
+            app.toggle_console(Some(":add "));
+        }
+        KeyCode::Char('d') => {
+            app.toggle_console(Some(":delete "));
+        }
+        KeyCode::Char('/') => {
+            app.toggle_console(Some(":search "));
+        }
+        KeyCode::Char(':') => {
+            app.toggle_console(Some(":"));
         }
         KeyCode::Char('o') => {
             app.open();
