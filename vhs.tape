@@ -11,8 +11,10 @@ Type " -c ./src/config/tabss.toml"
 Sleep 1s
 Enter
 Show
-Sleep 2s
+Sleep 1s
 
+Down
+Sleep 2500ms
 Down
 Sleep 500ms
 Right
@@ -57,5 +59,57 @@ Down
 Sleep 500ms
 Right
 Sleep 500ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
+Down
+Sleep 250ms
 Down
 Sleep 4s
