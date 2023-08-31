@@ -73,7 +73,7 @@ impl Theme {
         if let Some(s) = self.selection {
             s.to_owned()
         } else {
-            self.active_selection()
+            self.base.clone().add_modifier(Modifier::REVERSED)
         }
     }
 
@@ -81,7 +81,7 @@ impl Theme {
         if let Some(s) = self.selection_active {
             s.to_owned()
         } else {
-            self.base.clone().add_modifier(Modifier::REVERSED)
+            self.selection()
         }
     }
 

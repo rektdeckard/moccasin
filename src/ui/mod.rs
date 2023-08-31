@@ -70,7 +70,6 @@ fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, 
     let area = centered_rect_ratio((5, 9), (5, 9), area);
 
     let block = Block::default()
-        .title("Keybinds")
         .borders(Borders::ALL)
         .border_style(app.config.theme().overlay())
         .border_type(BorderType::Plain)
@@ -81,24 +80,39 @@ fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, 
             left: 2,
             right: 2,
         });
-    let lines = vec![
+
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+        .split(area);
+
+    let basic = vec![
         Line::from("j/k    scroll down/up"),
         Line::from("h/l    focus previous/next panel"),
         Line::from("Ent    select current"),
         Line::from("Esc    deselect current"),
         Line::from("Tab    cycle tabs"),
         Line::from("b/f/t  go to Browse/Favorites/Tags tab"),
-        Line::from("a      add a feed"),
+        Line::from(":      console mode"),
         Line::from("r      refresh all feeds"),
         Line::from("q      quit"),
         Line::from("o      open feed/item in browser"),
-        Line::from(",      open config file in default editor"),
+        Line::from(",      open config file"),
         Line::from("?      toggle this help dialog"),
     ];
-    let keybinds = Paragraph::new(lines).block(block);
+    let basic_keybinds = Paragraph::new(basic).block(block.clone().title("Keybinds"));
+
+    let console = vec![
+        Line::from(":add <URL>      scroll down/up"),
+        Line::from(":delete <URL>   focus previous/next panel"),
+        Line::from(":search <TERM>  filter feeds"),
+        Line::from("Esc             exit console mode"),
+    ];
+    let console_keybinds = Paragraph::new(console).block(block.title("Console"));
 
     frame.render_widget(Clear, area);
-    frame.render_widget(keybinds, area);
+    frame.render_widget(basic_keybinds, layout[0]);
+    frame.render_widget(console_keybinds, layout[1]);
 }
 
 fn render_console_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
