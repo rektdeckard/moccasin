@@ -42,17 +42,17 @@ fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Re
     let browse = Tab::Browse.to_string().clone();
     let (b, rowse) = browse.split_at(1);
     let b = b.underlined().to_owned();
-    let browse = Line::from(vec![b, rowse.reset()]);
+    let browse = Line::from(vec![b, rowse.into()]);
 
     let favorites = Tab::Favorites.to_string().clone();
     let (f, avorites) = favorites.split_at(1);
     let f = f.underlined().to_owned();
-    let favorites = Line::from(vec![f, avorites.reset()]);
+    let favorites = Line::from(vec![f, avorites.into()]);
 
     let tags = Tab::Tags.to_string().clone();
     let (t, ags) = tags.split_at(1);
     let t = t.underlined().to_owned();
-    let tags = Line::from(vec![t, ags.reset()]);
+    let tags = Line::from(vec![t, ags.into()]);
 
     let tabs = Tabs::new(vec![browse, favorites, tags])
         .block(
@@ -70,7 +70,6 @@ fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, 
     let area = centered_rect_ratio((5, 9), (5, 9), area);
 
     let block = Block::default()
-        .title("Keybinds")
         .borders(Borders::ALL)
         .border_style(app.config.theme().overlay())
         .border_type(BorderType::Plain)
@@ -81,24 +80,39 @@ fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, 
             left: 2,
             right: 2,
         });
-    let lines = vec![
+
+    let layout = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Ratio(1, 2), Constraint::Ratio(1, 2)])
+        .split(area);
+
+    let basic = vec![
         Line::from("j/k    scroll down/up"),
         Line::from("h/l    focus previous/next panel"),
         Line::from("Ent    select current"),
         Line::from("Esc    deselect current"),
         Line::from("Tab    cycle tabs"),
         Line::from("b/f/t  go to Browse/Favorites/Tags tab"),
-        Line::from("a      add a feed"),
+        Line::from(":      console mode"),
         Line::from("r      refresh all feeds"),
         Line::from("q      quit"),
         Line::from("o      open feed/item in browser"),
-        Line::from(",      open config file in default editor"),
+        Line::from(",      open config file"),
         Line::from("?      toggle this help dialog"),
     ];
-    let keybinds = Paragraph::new(lines).block(block);
+    let basic_keybinds = Paragraph::new(basic).block(block.clone().title("Keybinds"));
+
+    let console = vec![
+        Line::from(":add <URL>      scroll down/up"),
+        Line::from(":delete <URL>   focus previous/next panel"),
+        Line::from(":search <TERM>  filter feeds"),
+        Line::from("Esc             exit console mode"),
+    ];
+    let console_keybinds = Paragraph::new(console).block(block.title("Console"));
 
     frame.render_widget(Clear, area);
-    frame.render_widget(keybinds, area);
+    frame.render_widget(basic_keybinds, layout[0]);
+    frame.render_widget(console_keybinds, layout[1]);
 }
 
 fn render_console_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
@@ -128,13 +142,13 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
     if app.should_render_console() {
         render_console_area(app, frame, area)
     } else {
-        match app.status {
+        match &app.status {
             Status::Loading(n, count) => {
-                if count > 0 {
+                if *count > 0 {
                     frame.render_widget(
                         Gauge::default()
                             .block(block)
-                            .ratio(n as f64 / count as f64)
+                            .ratio(*n as f64 / *count as f64)
                             .label(format!("Loading {}/{}", n, count))
                             .use_unicode(true)
                             .gauge_style(app.config.theme().status()),
@@ -159,9 +173,9 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
                     area,
                 );
             }
-            Status::Errored => {
+            Status::Errored(s) => {
                 frame.render_widget(
-                    Paragraph::new("ERROR")
+                    Paragraph::new(format!("ERROR: {}", s))
                         .alignment(Alignment::Center)
                         .block(block),
                     area,

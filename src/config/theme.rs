@@ -73,7 +73,7 @@ impl Theme {
         if let Some(s) = self.selection {
             s.to_owned()
         } else {
-            self.active_selection()
+            self.base.clone().add_modifier(Modifier::REVERSED)
         }
     }
 
@@ -81,7 +81,7 @@ impl Theme {
         if let Some(s) = self.selection_active {
             s.to_owned()
         } else {
-            self.base.clone().add_modifier(Modifier::REVERSED)
+            self.selection()
         }
     }
 
@@ -130,6 +130,7 @@ impl Theme {
         let gray = make_color("#bbbbbb");
         let midnight = make_color("#000080");
         let yellow = make_color("#fefd72");
+        let red = make_color("#850908");
 
         Self {
             base: Style::default().fg(white).bg(midnight),
