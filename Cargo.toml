@@ -1,10 +1,10 @@
 [package]
 name = "moccasin"
-version = "0.1.0"
+version = "0.1.2"
 edition = "2021"
 authors = ["Tobias Fried <friedtm@gmail.com>"]
 license = "MIT"
-description = "A tool to search files"
+description = "A TUI feed reader for RSS, Atom, and (aspirationally) Podcasts"
 readme = "README.md"
 homepage = "https://github.com/rektdeckard/moccasin"
 repository = "https://github.com/rektdeckard/moccasin"

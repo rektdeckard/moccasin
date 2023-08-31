@@ -67,15 +67,17 @@ fn sort_feeds(feeds: &mut Vec<Feed>, config: &Config) {
 impl Repository {
     pub fn init(config: &Config, app_tx: UnboundedSender<RepositoryEvent>) -> Result<Self> {
         let storage = Storage::init(config);
-        let tick_rate = Duration::from_secs(config.refresh_interval());
 
         let (storage_tx, storage_rx) = mpsc::unbounded_channel::<RepositoryEvent>();
 
-        let tx = storage_tx.clone();
-        thread::spawn(move || loop {
-            tx.send(RepositoryEvent::Refresh);
-            thread::sleep(tick_rate);
-        });
+        if config.refresh_interval() > 0 {
+            let tick_rate = Duration::from_secs(config.refresh_interval());
+            let tx = storage_tx.clone();
+            thread::spawn(move || loop {
+                tx.send(RepositoryEvent::Refresh);
+                thread::sleep(tick_rate);
+            });
+        }
 
         Ok(Self {
             storage,
@@ -91,33 +93,25 @@ impl Repository {
         let waker = futures::task::noop_waker();
         let mut cx = std::task::Context::from_waker(&waker);
 
-        loop {
-            match self.storage_rx.poll_recv(&mut cx) {
-                Poll::Ready(m) => match m {
-                    Some(RepositoryEvent::RetrievedAll(feeds)) => {
-                        self.storage.write_all(&feeds);
-                        self.app_tx.send(RepositoryEvent::RetrievedAll(feeds));
-                        self.handle_many = None;
-                    }
-                    Some(RepositoryEvent::RetrievedOne(feed)) => {
-                        self.storage.write_one(&feed);
-                        self.app_tx.send(RepositoryEvent::RetrievedOne(feed));
-                        self.handle_one = None;
-                    }
-                    Some(RepositoryEvent::Refresh) => {
-                        self.refresh_all(config);
-                    }
-                    Some(_) => {
-                        // Skip other messages
-                    }
-                    None => {
-                        break;
-                    }
-                },
-                Poll::Pending => {
-                    break;
+        match self.storage_rx.poll_recv(&mut cx) {
+            Poll::Ready(m) => match m {
+                Some(RepositoryEvent::RetrievedAll(feeds)) => {
+                    self.storage.write_all(&feeds);
+                    self.app_tx.send(RepositoryEvent::RetrievedAll(feeds));
+                    self.handle_many = None;
                 }
-            }
+                Some(RepositoryEvent::RetrievedOne(feed)) => {
+                    self.storage.write_one(&feed);
+                    self.app_tx.send(RepositoryEvent::RetrievedOne(feed));
+                    self.handle_one = None;
+                }
+                Some(RepositoryEvent::Refresh) => {
+                    self.refresh_all(config);
+                }
+                Some(_) => {}
+                None => {}
+            },
+            Poll::Pending => {}
         }
     }
 

@@ -1,6 +1,6 @@
 # moccasin
 
-A TUI feed reader for RSS, Atom, and (eventually) Podcasts. This is not
+A TUI feed reader for RSS, Atom, and (eventually) Podcasts. VIM keybindings. Ranger-inspired interface. Configurable.
 
 ![Crates.io (version)](https://img.shields.io/crates/v/moccasin.svg?style=flat-square)
 ![CI status](https://img.shields.io/github/actions/workflow/status/rektdeckard/moccasin/vhs.yaml?style=flat-square)
@@ -18,6 +18,28 @@ A TUI feed reader for RSS, Atom, and (eventually) Podcasts. This is not
 cargo install moccasin
 ```
 
+## Usage
+
+Since "moccasin" is hard to spell and has too many letters, the executable is just called `mcsn`.
+
+```bash
+mcsn [OPTIONS]
+```
+
+### Options
+
+Command line arguments will override any values set in your [config file](#moccasintoml) for that session.
+
+| Short | Long             | Args             | Description                                                                                             |
+| ----- | ---------------- | ---------------- | ------------------------------------------------------------------------------------------------------- |
+| `-c`  | `--config`       | \<PATH\>         | Set a custom config file                                                                                |
+| `-s`  | `--color-scheme` | \<COLOR_SCHEME\> | Set a color scheme, either [built-in](#moccasintoml) or a path to a [custom theme](#color-schemes) file |
+| `-i`  | `--interval`     | \<INTERVAL\>     | Set a custom refresh rate in seconds                                                                    |
+| `-t`  | `--timeout`      | \<TIMEOUT\>      | Set a custom request timeout in seconds                                                                 |
+| `-n`  | `--no-cache`     |                  | Do not cache feeds in local file-backed database                                                        |
+| `-h`  | `--help`         |                  | Print help                                                                                              |
+| `-V`  | `--version`      |                  | Print version                                                                                           |
+
 ## Config
 
 On first boot, Moccasin will create both a database and a config file in your default config directory, which varies by platform:
@@ -29,6 +51,8 @@ On first boot, Moccasin will create both a database and a config file in your de
 | Windows  | `{FOLDERID_LocalAppData}`\\rektsoft\moccasin\\config       | C:\Users\Alice\AppData\Local\rektsoft\moccasin\config           |
 
 The `moccasin.toml` file in this directory can be edited to customize app behavior, add feeds in bulk, change the color scheme, etc. Most of these properties can be changed from within the application as well, which will write to this file. Configuration options are as follows:
+
+### `moccasin.toml`
 
 | Table           | Field              | Type          | Default     | Description                                                                                                                                                                                                         |
 | --------------- | ------------------ | ------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -87,6 +111,34 @@ The styleable properties are all optional, inheriting sensible defaults. Availab
 | `scrollbar`        | `base`             | Thumb (`fg`) and track (`bg`) of scrollbars   |
 
 > \* NOTE: it is important to define `border` when the style it inherits (either `base` or `border_active`) is defined as a hex color, otherwise it will be difficult to know which panel is currently active.
+
+## Keybinds
+
+The application uses VIM-style keybinds, but arrow keys can also be used for navigation. At the moment, the app has a `NORMAL` mode and a `COMMAND` mode. In future, you should also be able to tag and group feeds and items in `GROUP` mode.
+
+### NORMAL mode
+
+| Keys        | Description                       |
+| ----------- | --------------------------------- |
+| `j`/`k`     | Focus next/previous item          |
+| `h`/`l`     | Focus previous/next panel         |
+| `Enter`     | Select current item               |
+| `Esc`       | Deselect current item/mode        |
+| `Tab`       | Cycle tabs                        |
+| `b`/`f`/`t` | View Browse/Favorites/Tags tab    |
+| `r`         | Refresh all feeds                 |
+| `o`         | Open current feed/item in browser |
+| `:`         | Enter `COMMAND` mode              |
+| `,`         | Open config file                  |
+| `?`         | Show keybinds                     |
+
+### COMMAND mode
+
+| Command         | Args     | Description                                                                                            |
+| --------------- | -------- | ------------------------------------------------------------------------------------------------------ |
+| `:a`, `:add`    | \<URL\>  | Add a feed                                                                                             |
+| `:d`, `:delete` | [URL]    | Delete feed for `URL`, or current feed if not supplied. Removes this entry from config file and cache. |
+| `:s`, `:search` | \<TEXT\> | Search for a feed, item, or text content                                                               |
 
 ## License
 

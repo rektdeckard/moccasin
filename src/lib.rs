@@ -6,3 +6,4 @@ pub mod feed;
 pub mod handler;
 pub mod tui;
 pub mod ui;
+pub mod util;
