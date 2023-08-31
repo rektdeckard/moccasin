@@ -1,7 +1,5 @@
-use clap::Parser;
 use crossterm::terminal;
-use moccasin::app::{App, AppResult, Args};
-use moccasin::config::Config;
+use moccasin::app::{App, AppResult};
 use moccasin::event::{Event, EventHandler};
 use moccasin::handler::{handle_key_events, handle_mouse_events, handle_resize_events};
 use moccasin::tui::Tui;
@@ -11,14 +9,8 @@ use tui::Terminal;
 
 #[tokio::main]
 async fn main() -> AppResult<()> {
-    // Parse arguments
-    let args = Args::parse();
-
-    // Read or create config
-    let config = Config::new(args)?;
-
     // Create an application.
-    let mut app = App::init(terminal::size().unwrap(), config).await?;
+    let mut app = App::init(terminal::size().unwrap())?;
 
     // Initialize the terminal user interface.
     let backend = CrosstermBackend::new(io::stderr());

@@ -42,17 +42,17 @@ fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Re
     let browse = Tab::Browse.to_string().clone();
     let (b, rowse) = browse.split_at(1);
     let b = b.underlined().to_owned();
-    let browse = Line::from(vec![b, rowse.reset()]);
+    let browse = Line::from(vec![b, rowse.into()]);
 
     let favorites = Tab::Favorites.to_string().clone();
     let (f, avorites) = favorites.split_at(1);
     let f = f.underlined().to_owned();
-    let favorites = Line::from(vec![f, avorites.reset()]);
+    let favorites = Line::from(vec![f, avorites.into()]);
 
     let tags = Tab::Tags.to_string().clone();
     let (t, ags) = tags.split_at(1);
     let t = t.underlined().to_owned();
-    let tags = Line::from(vec![t, ags.reset()]);
+    let tags = Line::from(vec![t, ags.into()]);
 
     let tabs = Tabs::new(vec![browse, favorites, tags])
         .block(
@@ -128,13 +128,13 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
     if app.should_render_console() {
         render_console_area(app, frame, area)
     } else {
-        match app.status {
+        match &app.status {
             Status::Loading(n, count) => {
-                if count > 0 {
+                if *count > 0 {
                     frame.render_widget(
                         Gauge::default()
                             .block(block)
-                            .ratio(n as f64 / count as f64)
+                            .ratio(*n as f64 / *count as f64)
                             .label(format!("Loading {}/{}", n, count))
                             .use_unicode(true)
                             .gauge_style(app.config.theme().status()),
@@ -159,9 +159,9 @@ fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: 
                     area,
                 );
             }
-            Status::Errored => {
+            Status::Errored(s) => {
                 frame.render_widget(
-                    Paragraph::new("ERROR")
+                    Paragraph::new(format!("ERROR: {}", s))
                         .alignment(Alignment::Center)
                         .block(block),
                     area,

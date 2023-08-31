@@ -130,6 +130,7 @@ impl Theme {
         let gray = make_color("#bbbbbb");
         let midnight = make_color("#000080");
         let yellow = make_color("#fefd72");
+        let red = make_color("#850908");
 
         Self {
             base: Style::default().fg(white).bg(midnight),

@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::feed::{Feed, Item};
-use crate::repo::{Repository, StorageEvent};
+use crate::repo::{Repository, RepositoryEvent};
 use anyhow::Result;
 use clap::Parser;
 use std::error;
@@ -40,7 +40,7 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 #[derive(Debug)]
 pub enum Status {
     Loading(usize, usize),
-    Errored,
+    Errored(String),
     Done,
 }
 
@@ -107,23 +107,19 @@ pub struct App {
     pub status: Status,
     pub command_state: InputState,
     dimensions: (u16, u16),
-    rx: UnboundedReceiver<StorageEvent>,
+    repo_rx: UnboundedReceiver<RepositoryEvent>,
 }
 
 impl App {
-    pub async fn init(dimensions: (u16, u16), config: Config) -> Result<Self> {
-        let urls = config.feed_urls();
-        let feeds_count = urls.len() as u16;
+    pub fn init(dimensions: (u16, u16)) -> Result<Self> {
+        let args = Args::parse();
+        let config = Config::new(args)?;
 
-        let (tx, rx) = mpsc::unbounded_channel::<StorageEvent>();
-        let mut repo = Repository::init(&config, tx).await?;
+        let (tx, rx) = mpsc::unbounded_channel::<RepositoryEvent>();
+        let mut repo = Repository::init(&config, tx)?;
 
-        let items = if config.should_cache() {
-            repo.get_all_from_db(&config)?
-        } else {
-            Vec::new()
-        };
-        repo.refresh_all(&config);
+        let items = repo.read_all(&config).unwrap_or_default();
+        let feeds_count = items.len() as u16;
 
         Ok(Self {
             config,
@@ -141,43 +137,39 @@ impl App {
             status: Status::Done,
             show_keybinds: false,
             command_state: InputState::new(),
-            rx,
+            repo_rx: rx,
         })
     }
 
     /// Handles the tick event of the terminal.
     pub fn tick(&mut self) {
+        self.repo.tick(&self.config);
+
         let waker = futures::task::noop_waker();
         let mut cx = std::task::Context::from_waker(&waker);
 
         loop {
-            match self.rx.poll_recv(&mut cx) {
+            match self.repo_rx.poll_recv(&mut cx) {
                 Poll::Ready(m) => match m {
-                    Some(StorageEvent::Requesting(amount)) => {
+                    Some(RepositoryEvent::Requesting(amount)) => {
                         self.status = match self.status {
                             Status::Loading(curr, total) => Status::Loading(curr, total + amount),
                             _ => Status::Loading(0, amount),
                         };
                     }
-                    Some(StorageEvent::Fetched(counts)) => {
+                    Some(RepositoryEvent::Requested(counts)) => {
                         let counts = match self.status {
                             Status::Loading(current, total) => ((current + 1).min(total), total),
                             _ => counts,
                         };
                         self.status = Status::Loading(counts.0, counts.1);
                     }
-                    Some(StorageEvent::RetrievedAll(feeds)) => {
-                        if self.config.should_cache() {
-                            self.repo.store_all(&feeds);
-                        }
+                    Some(RepositoryEvent::RetrievedAll(feeds)) => {
                         self.set_feeds(feeds);
                         self.status = Status::Done;
+                        break;
                     }
-                    Some(StorageEvent::RetrievedOne(feed)) => {
-                        if self.config.should_cache() {
-                            self.repo.store_one(&feed);
-                        }
-
+                    Some(RepositoryEvent::RetrievedOne(feed)) => {
                         match self
                             .feeds
                             .items
@@ -199,9 +191,17 @@ impl App {
                             }
                             _ => {}
                         }
+
+                        break;
                     }
-                    Some(StorageEvent::Errored) => {
-                        self.status = Status::Errored;
+                    Some(RepositoryEvent::Errored) => {
+                        self.status = Status::Errored("database transaction failed".into());
+                        break;
+                    }
+                    Some(RepositoryEvent::Refresh) => {}
+                    Some(RepositoryEvent::Aborted) => {
+                        self.status = Status::Done;
+                        break;
                     }
                     None => {
                         break;
@@ -232,6 +232,7 @@ impl App {
     }
 
     pub fn should_render_detail_scroll(&self) -> bool {
+        // TODO
         false
     }
 
@@ -467,7 +468,7 @@ impl App {
     }
 
     pub fn refresh_all(&mut self) {
-        let _ = self.repo.refresh_all(&self.config);
+        self.repo.refresh_all(&self.config)
     }
 
     pub fn toggle_keybinds(&mut self) {
@@ -540,14 +541,14 @@ impl App {
         match self.command_state.input.parse::<ConsoleCommand>() {
             Ok(ConsoleCommand::AddFeed(url)) => {
                 self.config.add_feed_url(&url);
-                self.repo.add_feed_by_url(&url, &self.config);
+                self.repo.add_feed_url(&url, &self.config);
             }
             Ok(ConsoleCommand::DeleteFeed(maybe_url)) => {
                 if let Some(url) =
                     maybe_url.or(self.current_feed().and_then(|f| Some(f.link().into())))
                 {
                     self.config.remove_feed_url(&url);
-                    self.repo.remove_feed_by_url(&url, &self.config);
+                    self.repo.remove_feed_url(&url);
 
                     // TODO: refactor, this is so bad
                     self.feeds.items.retain(|u| u.link() != url);
@@ -557,7 +558,7 @@ impl App {
                 }
             }
             Ok(ConsoleCommand::Search(_)) => todo!(),
-            _ => self.status = Status::Errored,
+            _ => self.status = Status::Errored("unrecognized command".into()),
         }
 
         self.command_state.input.clear();

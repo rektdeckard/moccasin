@@ -43,8 +43,8 @@ sort_feeds = "a-z"
 cache_feeds = true
 
 # How often to refresh feeds, in seconds.
-# The default is 300, and 0 means refresh will only occur on startup.
-refresh_interval = 300
+# The default is 3600 (1 hour), and 0 means refresh will only occur on startup.
+refresh_interval = 3600
 
 # How long to wait on a given feed before timing out, in seconds
 refresh_timeout = 5

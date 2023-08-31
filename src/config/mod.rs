@@ -15,7 +15,7 @@ const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 const DEFAULT_REFRESH_TIMEOUT: u64 = 5;
 
 #[derive(Debug, Default, Clone)]
-pub struct Config {
+pub struct Config{
     file_path: PathBuf,
     dir_path: PathBuf,
     feed_urls: Vec<String>,
