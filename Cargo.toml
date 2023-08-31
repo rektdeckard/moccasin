@@ -8,7 +8,7 @@ description = "A tool to search files"
 readme = "README.md"
 homepage = "https://github.com/rektdeckard/moccasin"
 repository = "https://github.com/rektdeckard/moccasin"
-keywords = ["rss", "atom", "feed reader", "tui"]
+keywords = ["rss", "atom", "feed-reader", "tui"]
 categories = ["command-line-utilities"]
 
 [[bin]]
