@@ -18,6 +18,20 @@ A TUI feed reader for RSS, Atom, and (eventually) Podcasts. VIM keybindings. Ran
 cargo install moccasin
 ```
 
+### NetBSD
+
+If you are on NetBSD, a pre-compiled binary is available from the official repositories. To install it, simply run:
+
+```bash
+pkgin install moccasin
+```
+
+Or, if you prefer to build from source:
+```
+cd /usr/pkgsrc/news/moccasin
+make install
+```
+
 ## Usage
 
 Since "moccasin" is hard to spell and has too many letters, the executable is just called `mcsn`.
