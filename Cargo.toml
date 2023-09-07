@@ -22,13 +22,17 @@ clap = { version = "4.4", features = ["derive"] }
 colorsys = "0.6"
 crossterm = "0.27"
 directories = "5"
+ducktype = { path = "../ducktype" }
 futures = "0.3"
 html-escape = "0.2"
 html_parser = "0.7.0"
+log = "0.4.20"
 polodb_core = "4.4.0"
 reqwest = { version = "0.11" }
 rss = { version = "2", features = ["atom"] }
+rusqlite = { version = "0.29.0", features = ["bundled", "serde_json"] }
 serde = { version = "1", features = ["derive"] }
+simplelog = "0.12.1"
 tokio = { version = "1", features = ["full"] }
 toml = "0.7"
 toml_edit = "0.19"

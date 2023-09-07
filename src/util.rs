@@ -24,3 +24,16 @@ pub fn sort_feeds(feeds: &mut Vec<Feed>, config: &Config) {
         SortOrder::Oldest => feeds.sort_by(|a, b| b.last_fetched().cmp(&a.last_fetched())),
     }
 }
+
+#[macro_export]
+macro_rules! report {
+    ($fallible:expr, $message:literal) => {
+        match $fallible {
+            Err(_) => {
+                use log::error;
+                error!($message)
+            }
+            _ => {}
+        }
+    };
+}
