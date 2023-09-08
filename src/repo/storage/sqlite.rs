@@ -32,6 +32,23 @@ impl<'stmt> FromRow<'stmt> for Feed {
     }
 }
 
+impl<'stmt> Item {
+    fn from_row(row: &'stmt Row, feed_id: &str) -> Self {
+        Item {
+            id: row.get(0).unwrap(),
+            feed_id: feed_id.into(),
+            title: row.get(2).ok(),
+            author: row.get(3).ok(),
+            content: row.get(4).ok(),
+            description: row.get(5).ok(),
+            text_description: row.get(6).ok(),
+            categories: vec![], // FIXME
+            link: row.get(8).ok(),
+            pub_date: row.get(9).ok(),
+        }
+    }
+}
+
 impl Storage<StorageError> for SQLiteStorage {
     fn init(config: &Config) -> Self {
         let conn = if config.should_cache() {
@@ -50,9 +67,18 @@ impl Storage<StorageError> for SQLiteStorage {
         let stmt = "SELECT * FROM feeds";
         let mut stmt = self.conn.prepare_cached(stmt).map_err(|_| StorageError)?;
 
-        let feeds_iter = stmt.query_map([], |row| Ok(Feed::from_row(row)));
+        let feeds_iter = stmt.query_map([], |row| {
+            let mut feed = Feed::from_row(row);
+            match self.read_items_for_feed_id(feed.id()) {
+                Ok(items) => feed.items = items,
+                Err(_) => {
+                    error!("Failed to fetch items for feed {}", feed.id());
+                }
+            }
+            Ok(feed)
+        });
         let mut feeds = feeds_iter
-            .expect("Could not unwrap query")
+            .expect("Could not unwrap feeds")
             .filter_map(|r| r.ok())
             .collect::<Vec<_>>();
 
@@ -61,11 +87,20 @@ impl Storage<StorageError> for SQLiteStorage {
     }
 
     fn read_items_for_feed_id(&self, id: &str) -> Result<Vec<Item>, StorageError> {
-        todo!()
+        let stmt = "SELECT * FROM items WHERE feed_id = ?1";
+        let mut stmt = self.conn.prepare_cached(stmt).map_err(|_| StorageError)?;
+
+        let items_iter = stmt.query_map([id], |r| Ok(Item::from_row(r, id)));
+        let items = items_iter
+            .expect("Could not unwrap items")
+            .filter_map(|r| r.ok())
+            .collect::<Vec<_>>();
+
+        Ok(items)
     }
 
     fn write_feed(&self, feed: &Feed) -> Result<StorageEvent, StorageError> {
-        let feed_stmt = "INSERT OR REPLACE INTO feeds(
+        let stmt = "INSERT OR REPLACE INTO feeds(
             id,
             title,
             description,
@@ -80,12 +115,12 @@ impl Storage<StorageError> for SQLiteStorage {
             ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
         )";
 
-        let mut feed_stmt = self.conn.prepare_cached(feed_stmt).map_err(|err| {
+        let mut stmt = self.conn.prepare_cached(stmt).map_err(|err| {
             warn!("{:?}", err);
             StorageError
         })?;
 
-        match feed_stmt.execute([
+        match stmt.execute([
             feed.id(),
             feed.title(),
             feed.description(),
@@ -115,7 +150,45 @@ impl Storage<StorageError> for SQLiteStorage {
     }
 
     fn write_item(&self, item: &Item) -> Result<StorageEvent, StorageError> {
-        todo!()
+        let stmt = "INSERT OR REPLACE INTO items(
+            id,
+            feed_id,
+            title,
+            author,
+            content,
+            description,
+            text_description,
+            categories,
+            link,
+            pub_date
+        ) VALUES(
+            IFNULL((SELECT id FROM items WHERE id = ?1), ?1),
+            ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+        )";
+
+        let mut stmt = self.conn.prepare_cached(stmt).map_err(|err| {
+            warn!("{:?}", err);
+            StorageError
+        })?;
+
+        match stmt.execute([
+            item.id(),
+            item.feed_id(),
+            item.title().unwrap_or("NULL"),
+            item.author().unwrap_or("NULL"),
+            item.content().unwrap_or("NULL"),
+            item.description().unwrap_or("NULL"),
+            item.description().unwrap_or("NULL"),
+            "[]",
+            item.link().unwrap_or("NULL"),
+            item.pub_date().unwrap_or("NULL"),
+        ]) {
+            Ok(_) => Ok(StorageEvent::Insert),
+            Err(err) => {
+                error!("{:?}", err);
+                Err(StorageError)
+            }
+        }
     }
 
     fn delete_feed_with_url(&self, url: &str) -> Result<StorageEvent, StorageError> {

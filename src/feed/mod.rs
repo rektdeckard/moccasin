@@ -118,16 +118,16 @@ impl Feed {
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize)]
 pub struct Item {
-    id: String,
-    feed_id: String,
-    title: Option<String>,
-    author: Option<String>,
-    content: Option<String>,
-    description: Option<String>,
-    text_description: Option<String>,
-    categories: Vec<Category>,
-    link: Option<String>,
-    pub_date: Option<String>,
+    pub(crate) id: String,
+    pub(crate) feed_id: String,
+    pub(crate) title: Option<String>,
+    pub(crate) author: Option<String>,
+    pub(crate) content: Option<String>,
+    pub(crate) description: Option<String>,
+    pub(crate) text_description: Option<String>,
+    pub(crate) categories: Vec<Category>,
+    pub(crate) link: Option<String>,
+    pub(crate) pub_date: Option<String>,
 }
 
 impl Item {
