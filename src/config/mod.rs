@@ -1,11 +1,16 @@
 use crate::app::Args;
 use anyhow::Result;
 use directories::ProjectDirs;
+use std::collections::HashSet;
+use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
 use std::{fs, fs::File};
 use toml::{Table, Value};
+use toml_edit::{value, Array, Document};
+
+use log::{info, warn};
 
 mod theme;
 
@@ -15,10 +20,10 @@ const DEFAULT_REFRESH_INTERVAL: u64 = 300;
 const DEFAULT_REFRESH_TIMEOUT: u64 = 5;
 
 #[derive(Debug, Default, Clone)]
-pub struct Config{
+pub struct Config {
     file_path: PathBuf,
     dir_path: PathBuf,
-    feed_urls: Vec<String>,
+    feed_urls: HashSet<String>,
     sort_order: SortOrder,
     cache_control: CacheControl,
     refresh_interval: u64,
@@ -94,6 +99,21 @@ impl Config {
             (dir_path, file_path)
         };
 
+        if cfg!(debug_assertions) {
+            let file = OpenOptions::new()
+                .create(true)
+                .write(true)
+                .append(true)
+                .open(dir_path.join("moccasin.log"))
+                .expect("could not open file for witing");
+            simplelog::WriteLogger::init(
+                simplelog::LevelFilter::Info,
+                simplelog::Config::default(),
+                file,
+            )
+            .expect("could not initialize logger");
+        }
+
         if file_path.exists() {
             Self::read_from_toml(args, dir_path, file_path)
         } else {
@@ -121,7 +141,7 @@ impl Config {
         &self.theme
     }
 
-    pub fn feed_urls(&self) -> &Vec<String> {
+    pub fn feed_urls(&self) -> &HashSet<String> {
         &self.feed_urls
     }
 
@@ -142,38 +162,42 @@ impl Config {
     }
 
     pub fn write_config(&self) -> Result<()> {
-        todo!();
-        // let toml = fs::read_to_string(&self.file_path)?;
-        // let toml = toml.parse::<Table>()?;
-        // match toml.get("sources") {
-        //     Some(Value::Table(sources)) => match sources.get("feeds") {
-        //         Some(Value::Array(feeds)) => {
-        //             *feeds = self.feed_urls.into();
-        //         },
-        //         _ => {}
-        //     }
-        //     _ => {}
-        // }
-        // let feeds = sources.get("feeds")?;
-        // let file = fs::write(self.file_path, contents);
+        let toml = fs::read_to_string(&self.file_path)?;
+        let mut toml = toml.parse::<Document>()?;
+
+        let mut urls = Array::new();
+        for url in self.feed_urls() {
+            urls.push_formatted(url.into());
+        }
+        urls.set_trailing_comma(true);
+        toml["sources"]["feeds"] = value(urls);
+
+        let _ = fs::write(&self.file_path, toml.to_string())?;
+        Ok(())
     }
 
     pub fn add_feed_url(&mut self, url: &str) -> Result<()> {
-        self.feed_urls.push(url.into());
-        // self.write_config()
+        if !self.feed_urls().contains(url) {
+            info!("Adding new feed for {}", url);
+            self.feed_urls.insert(url.into());
+            self.write_config()?;
+        }
         Ok(())
     }
 
     pub fn remove_feed_url(&mut self, url: &str) -> Result<()> {
-        self.feed_urls.retain(|u| u != url);
-        // self.write_config()
+        if self.feed_urls().contains(url) {
+            info!("Deleting feed for {}", url);
+            self.feed_urls.remove(url);
+            self.write_config()?;
+        }
         Ok(())
     }
 
     fn read_from_toml(args: Args, dir_path: PathBuf, file_path: PathBuf) -> Result<Self> {
         let toml = fs::read_to_string(&file_path)?;
         let table = toml.parse::<Table>()?;
-        let feeds: Vec<String> = match table.get("sources") {
+        let feeds: HashSet<String> = match table.get("sources") {
             Some(Value::Table(sources)) => match sources.get("feeds") {
                 Some(Value::Array(els)) => els
                     .iter()
@@ -182,7 +206,7 @@ impl Config {
                 Some(_) => {
                     panic!("unexpected config entry for [sources].feeds")
                 }
-                _ => vec![],
+                _ => HashSet::new(),
             },
             _ => panic!("unexpected config entry for [sources]"),
         };
@@ -266,15 +290,16 @@ impl Config {
         fs::create_dir_all(&dir_path)?;
         let cfg_path = Path::new(dir_path.as_path()).join(DEFAULT_CONFIG_FILE);
         let mut file = File::create(&cfg_path)?;
-        let stub = include_str!("moccasin.toml").parse::<Table>()?;
+        let toml = include_str!("moccasin.toml");
+        let stub = toml.parse::<Table>()?;
         let feed_urls = stub["sources"]["feeds"]
             .as_array()
             .expect("parse default feeds")
             .iter()
             .filter_map(Value::as_str)
             .map(String::from)
-            .collect::<Vec<_>>();
-        file.write(&stub.to_string().as_bytes())?;
+            .collect::<HashSet<_>>();
+        file.write(toml.as_bytes())?;
 
         // TODO: load theme from args if present
         Ok(Self {

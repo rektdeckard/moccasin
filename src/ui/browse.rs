@@ -1,4 +1,4 @@
-use crate::app::{View, App};
+use crate::app::{App, View};
 use tui::{
     backend::Backend,
     layout::Alignment,

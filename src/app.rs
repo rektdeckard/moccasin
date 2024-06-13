@@ -545,13 +545,13 @@ impl App {
             }
             Ok(ConsoleCommand::DeleteFeed(maybe_url)) => {
                 if let Some(url) =
-                    maybe_url.or(self.current_feed().and_then(|f| Some(f.link().into())))
+                    maybe_url.or(self.current_feed().and_then(|f| Some(f.url().into())))
                 {
                     self.config.remove_feed_url(&url);
                     self.repo.remove_feed_url(&url);
 
                     // TODO: refactor, this is so bad
-                    self.feeds.items.retain(|u| u.link() != url);
+                    self.feeds.items.retain(|u| u.url() != url);
                     self.feeds.state.select(None);
                     self.reset_items_scroll();
                     self.reset_detail_scroll();

@@ -1,9 +1,11 @@
-use super::storage::{Storage, StorageEvent};
 use super::RepositoryEvent;
-use crate::config::{Config, SortOrder};
+use super::storage::sqlite::SQLiteStorage;
+use crate::config::Config;
 use crate::feed::Feed;
+use crate::repo::storage::{StorageError, StorageEvent};
+use crate::report;
+use crate::util::sort_feeds;
 use anyhow::Result;
-use polodb_core::Error as PoloDBError;
 use std::fmt::Debug;
 use std::task::Poll;
 use std::thread;
@@ -20,13 +22,8 @@ enum FetchErr {
     Parse,
 }
 
-enum StorageRequest {
-    InsertOne,
-    UpsertMany,
-}
-
 pub struct Repository {
-    storage: Storage,
+    storage: SQLiteStorage,
     app_tx: mpsc::UnboundedSender<RepositoryEvent>,
     storage_tx: mpsc::UnboundedSender<RepositoryEvent>,
     storage_rx: mpsc::UnboundedReceiver<RepositoryEvent>,
@@ -40,33 +37,9 @@ impl Debug for Repository {
     }
 }
 
-fn sort_feeds(feeds: &mut Vec<Feed>, config: &Config) {
-    match config.sort_order() {
-        SortOrder::Az => {
-            feeds.sort_by(|a, b| a.title().partial_cmp(b.title()).unwrap());
-        }
-        SortOrder::Za => {
-            feeds.sort_by(|a, b| b.title().partial_cmp(a.title()).unwrap());
-        }
-        SortOrder::Custom => {
-            let urls = config.feed_urls();
-            feeds.sort_by(|a, b| {
-                let a_index = urls.iter().position(|u| a.link() == u).unwrap_or_default();
-                let b_index = urls.iter().position(|u| b.link() == u).unwrap_or_default();
-                a_index.cmp(&b_index)
-            })
-        }
-        SortOrder::Unread => {
-            unimplemented!()
-        }
-        SortOrder::Newest => feeds.sort_by(|a, b| a.last_fetched().cmp(&b.last_fetched())),
-        SortOrder::Oldest => feeds.sort_by(|a, b| b.last_fetched().cmp(&a.last_fetched())),
-    }
-}
-
 impl Repository {
     pub fn init(config: &Config, app_tx: UnboundedSender<RepositoryEvent>) -> Result<Self> {
-        let storage = Storage::init(config);
+        let storage = SQLiteStorage::init(config);
 
         let (storage_tx, storage_rx) = mpsc::unbounded_channel::<RepositoryEvent>();
 
@@ -74,7 +47,8 @@ impl Repository {
             let tick_rate = Duration::from_secs(config.refresh_interval());
             let tx = storage_tx.clone();
             thread::spawn(move || loop {
-                tx.send(RepositoryEvent::Refresh);
+                tx.send(RepositoryEvent::Refresh)
+                    .expect("Failed to send storage message");
                 thread::sleep(tick_rate);
             });
         }
@@ -96,13 +70,17 @@ impl Repository {
         match self.storage_rx.poll_recv(&mut cx) {
             Poll::Ready(m) => match m {
                 Some(RepositoryEvent::RetrievedAll(feeds)) => {
-                    self.storage.write_all(&feeds);
-                    self.app_tx.send(RepositoryEvent::RetrievedAll(feeds));
+                    report!(self.storage.write_feeds(&feeds), "Failed to write feeds");
+                    self.app_tx
+                        .send(RepositoryEvent::RetrievedAll(feeds))
+                        .expect("Failed to send app message");
                     self.handle_many = None;
                 }
                 Some(RepositoryEvent::RetrievedOne(feed)) => {
-                    self.storage.write_one(&feed);
-                    self.app_tx.send(RepositoryEvent::RetrievedOne(feed));
+                    report!(self.storage.write_feed(&feed, None), "Failed to write feed");
+                    self.app_tx
+                        .send(RepositoryEvent::RetrievedOne(feed))
+                        .expect("Failed to send app message");
                     self.handle_one = None;
                 }
                 Some(RepositoryEvent::Refresh) => {
@@ -115,15 +93,19 @@ impl Repository {
         }
     }
 
-    pub fn read_all(&mut self, config: &Config) -> Result<Vec<Feed>, PoloDBError> {
-        self.storage.read_all(config)
+    pub fn read_all(&mut self, config: &Config) -> Result<Vec<Feed>, StorageError> {
+        let res = self.storage.read_all(config);
+        report!(res, "Failed to read from DB");
+        res
     }
 
     pub fn add_feed_url(&mut self, url: &str, config: &Config) {
         let app_tx = self.app_tx.clone();
         if let Some(handle) = &self.handle_one {
             handle.abort();
-            app_tx.send(RepositoryEvent::Aborted);
+            app_tx
+                .send(RepositoryEvent::Aborted)
+                .expect("Failed to send app event");
             self.handle_one = None;
         }
 
@@ -131,7 +113,9 @@ impl Repository {
         let interval = config.refresh_timeout();
         let storage_tx = self.storage_tx.clone();
 
-        let _ = app_tx.send(RepositoryEvent::Requesting(1));
+        app_tx
+            .send(RepositoryEvent::Requesting(1))
+            .expect("Failed to send app event");
 
         self.handle_one = Some(tokio::spawn(async move {
             let client = reqwest::Client::builder()
@@ -142,18 +126,24 @@ impl Repository {
 
             match make_feed_request(client.get(url).send()).await {
                 Ok(feed) => {
-                    let _ = app_tx.send(RepositoryEvent::Requested((1, 1)));
-                    let _ = storage_tx.send(RepositoryEvent::RetrievedOne(feed));
+                    app_tx
+                        .send(RepositoryEvent::Requested((1, 1)))
+                        .expect("Failed to send app event");
+                    storage_tx
+                        .send(RepositoryEvent::RetrievedOne(feed))
+                        .expect("Failed to send app event");
                 }
                 Err(_) => {
-                    let _ = app_tx.send(RepositoryEvent::Errored);
+                    app_tx
+                        .send(RepositoryEvent::Errored)
+                        .expect("Failed to make feed request");
                 }
             }
         }));
     }
 
-    pub fn remove_feed_url(&mut self, url: &str) -> Result<StorageEvent, PoloDBError> {
-        self.storage.delete_one(url)
+    pub fn remove_feed_url(&mut self, url: &str) -> Result<StorageEvent, StorageError> {
+        self.storage.delete_feed_with_url(url)
     }
 
     pub fn refresh_all(&mut self, config: &Config) {
@@ -162,7 +152,7 @@ impl Repository {
             handle.abort();
             app_tx
                 .send(RepositoryEvent::Aborted)
-                .expect("SENDING ABORT");
+                .expect("Failed to send abort message");
             self.handle_many = None;
         }
 
@@ -171,14 +161,16 @@ impl Repository {
         let urls = config.feed_urls().clone();
         let count = urls.len();
 
-        let _ = app_tx.send(RepositoryEvent::Requesting(count));
+        app_tx
+            .send(RepositoryEvent::Requesting(count))
+            .expect("Could not send app message");
 
         self.handle_many = Some(tokio::spawn(async move {
             let client = reqwest::Client::builder()
                 .connect_timeout(Duration::from_secs(config.refresh_timeout()))
                 .timeout(Duration::from_secs(config.refresh_timeout()))
                 .build()
-                .expect("failed to build client");
+                .expect("Failed to build client");
             let futures: Vec<_> = urls.into_iter().map(|url| client.get(url).send()).collect();
             let handles: Vec<_> = futures
                 .into_iter()
@@ -187,7 +179,9 @@ impl Repository {
                     let app_tx = app_tx.clone();
                     tokio::task::spawn(async move {
                         let res = make_feed_request(req).await;
-                        let _ = app_tx.send(RepositoryEvent::Requested((n, count)));
+                        app_tx
+                            .send(RepositoryEvent::Requested((n, count)))
+                            .expect("Failed to send app message");
                         res
                     })
                 })
@@ -197,7 +191,7 @@ impl Repository {
                 .into_iter()
                 .filter_map(|handle| match handle {
                     Ok(res) => match res {
-                        Ok(channel) => Some(channel),
+                        Ok(feed) => Some(feed),
                         _ => None,
                     },
                     _ => None,
@@ -205,7 +199,9 @@ impl Repository {
                 .collect();
 
             sort_feeds(&mut feeds, &config);
-            let _ = storage_tx.send(RepositoryEvent::RetrievedAll(feeds));
+            storage_tx
+                .send(RepositoryEvent::RetrievedAll(feeds))
+                .expect("Failed to send storage message");
         }));
     }
 }
@@ -214,13 +210,16 @@ async fn make_feed_request(
     req: impl std::future::Future<Output = Result<reqwest::Response, reqwest::Error>>,
 ) -> Result<Feed, FetchErr> {
     match req.await {
-        Ok(res) => match res.bytes().await {
-            Ok(bytes) => match Feed::read_from(&bytes[..]) {
-                Ok(feed) => Ok(feed),
-                Err(_) => Err(FetchErr::Parse),
-            },
-            Err(_) => Err(FetchErr::Deserialize),
-        },
+        Ok(res) => {
+            let url = res.url().to_string();
+            match &res.bytes().await {
+                Ok(bytes) => match Feed::read_from(&bytes[..], url) {
+                    Ok(feed) => Ok(feed),
+                    Err(_) => Err(FetchErr::Parse),
+                },
+                Err(_) => Err(FetchErr::Deserialize),
+            }
+        }
         Err(_) => Err(FetchErr::Request),
     }
 }

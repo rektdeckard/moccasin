@@ -166,14 +166,14 @@ impl Theme {
 
     pub fn focus() -> Self {
         Self {
-            base: Style::default().on_black(),
+            base: Style::default(),
             overlay: Some(Style::default().reversed()),
             status: None,
-            border: Some(Style::default().black().on_black()),
-            border_active: Some(Style::default()),
-            selection: None,
-            selection_active: Some(Style::default().reversed()),
-            scrollbar: Some(Style::default().on_black()),
+            border: Some(Style::default().dim()),
+            border_active: Some(Style::default().bold()),
+            selection: Some(Style::default().reversed().dim()),
+            selection_active: Some(Style::default().reversed().bold()),
+            scrollbar: Some(Style::default()),
         }
     }
 
@@ -208,12 +208,15 @@ impl Theme {
     }
 
     pub fn redshift() -> Self {
+        let red = make_color("#d22123");
+        let black = make_color("#161616");
+
         Self {
-            base: Style::default().red().on_black(),
+            base: Style::default().fg(red).bg(black),
             overlay: None,
             status: None,
-            selection_active: Some(Style::default().red().reversed()),
-            border_active: Some(Style::default().red()),
+            selection_active: Some(Style::default().fg(red).reversed()),
+            border_active: Some(Style::default().fg(red)),
             selection: Some(Style::default().dim().reversed()),
             border: Some(Style::default().dim()),
             scrollbar: Some(Style::default().dim()),
