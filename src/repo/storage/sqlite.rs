@@ -1,11 +1,9 @@
-use super::{Storage, StorageError, StorageEvent};
+use super::{StorageError, StorageEvent};
 use crate::config::Config;
 use crate::feed::{Feed, Item};
-use crate::util;
+use crate::{report, util};
 use log::{error, info, warn};
-use rusqlite::{params_from_iter, Connection, Result, Row, ToSql};
-use serde::{Deserialize, Serialize};
-use std::marker::PhantomData;
+use rusqlite::{Connection, Result, Row, Transaction};
 
 pub struct SQLiteStorage {
     conn: Connection,
@@ -49,8 +47,60 @@ impl<'stmt> Item {
     }
 }
 
-impl Storage<StorageError> for SQLiteStorage {
-    fn init(config: &Config) -> Self {
+impl SQLiteStorage {
+    pub fn write_feed_tx(
+        &self,
+        feed: &Feed,
+        tx: &Transaction,
+    ) -> Result<StorageEvent, StorageError> {
+        let stmt = "INSERT OR REPLACE INTO feeds(
+            id,
+            title,
+            description,
+            categories,
+            url,
+            link,
+            ttl,
+            pub_date,
+            last_fetched
+        ) VALUES(
+            IFNULL((SELECT id FROM feeds WHERE id = ?1), ?1),
+            ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+        )";
+
+        let mut stmt = tx.prepare_cached(stmt).map_err(|err| {
+            warn!("{:?}", err);
+            StorageError
+        })?;
+
+        match stmt.execute([
+            feed.id(),
+            feed.title(),
+            feed.description(),
+            "[]",
+            feed.url(),
+            feed.link(),
+            feed.ttl().unwrap_or("NULL"),
+            feed.pub_date().unwrap_or("NULL"),
+            feed.last_fetched().unwrap_or("NULL"),
+        ]) {
+            Ok(_) => {
+                for item in feed.items() {
+                    self.write_item(item)?;
+                }
+
+                Ok(StorageEvent::Insert)
+            }
+            Err(err) => {
+                error!("{:?}", err);
+                Err(StorageError)
+            }
+        }
+    }
+}
+
+impl SQLiteStorage {
+    pub fn init(config: &Config) -> Self {
         let conn = if config.should_cache() {
             Connection::open(config.db_path()).expect("Could not open database")
         } else {
@@ -63,7 +113,7 @@ impl Storage<StorageError> for SQLiteStorage {
         Self { conn }
     }
 
-    fn read_all(&mut self, config: &Config) -> Result<Vec<Feed>, StorageError> {
+    pub fn read_all(&mut self, config: &Config) -> Result<Vec<Feed>, StorageError> {
         let stmt = "SELECT * FROM feeds";
         let mut stmt = self.conn.prepare_cached(stmt).map_err(|_| StorageError)?;
 
@@ -86,7 +136,7 @@ impl Storage<StorageError> for SQLiteStorage {
         Ok(feeds)
     }
 
-    fn read_items_for_feed_id(&self, id: &str) -> Result<Vec<Item>, StorageError> {
+    pub fn read_items_for_feed_id(&self, id: &str) -> Result<Vec<Item>, StorageError> {
         let stmt = "SELECT * FROM items WHERE feed_id = ?1";
         let mut stmt = self.conn.prepare_cached(stmt).map_err(|_| StorageError)?;
 
@@ -99,7 +149,11 @@ impl Storage<StorageError> for SQLiteStorage {
         Ok(items)
     }
 
-    fn write_feed(&self, feed: &Feed) -> Result<StorageEvent, StorageError> {
+    pub fn write_feed(
+        &self,
+        feed: &Feed,
+        tx: Option<&Transaction>,
+    ) -> Result<StorageEvent, StorageError> {
         let stmt = "INSERT OR REPLACE INTO feeds(
             id,
             title,
@@ -115,7 +169,12 @@ impl Storage<StorageError> for SQLiteStorage {
             ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
         )";
 
-        let mut stmt = self.conn.prepare_cached(stmt).map_err(|err| {
+        let mut stmt = (if let Some(tx) = tx {
+            tx.prepare_cached(stmt)
+        } else {
+            self.conn.prepare_cached(stmt)
+        })
+        .map_err(|err| {
             warn!("{:?}", err);
             StorageError
         })?;
@@ -145,11 +204,95 @@ impl Storage<StorageError> for SQLiteStorage {
         }
     }
 
-    fn write_feeds(&self, feeds: &Vec<Feed>) -> Result<Vec<StorageEvent>, StorageError> {
-        feeds.iter().map(|f| self.write_feed(f)).collect()
+    pub fn write_feeds(&mut self, feeds: &Vec<Feed>) -> Result<Vec<StorageEvent>, StorageError> {
+        if let Ok(tx) = self.conn.transaction() {
+            let feed_stmt = "INSERT OR REPLACE INTO feeds(
+                    id,
+                    title,
+                    description,
+                    categories,
+                    url,
+                    link,
+                    ttl,
+                    pub_date,
+                    last_fetched
+                ) VALUES(
+                    IFNULL((SELECT id FROM feeds WHERE id = ?1), ?1),
+                    ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9
+                )";
+
+            let item_stmt = "INSERT OR REPLACE INTO items(
+                    id,
+                    feed_id,
+                    title,
+                    author,
+                    content,
+                    description,
+                    text_description,
+                    categories,
+                    link,
+                    pub_date
+                ) VALUES(
+                    IFNULL((SELECT id FROM items WHERE id = ?1), ?1),
+                    ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10
+                )";
+
+            let mut feed_stmt = tx.prepare_cached(feed_stmt).map_err(|err| {
+                warn!("{:?}", err);
+                StorageError
+            })?;
+
+            let mut item_stmt = tx.prepare_cached(item_stmt).map_err(|err| {
+                warn!("{:?}", err);
+                StorageError
+            })?;
+
+            let mut events = vec![];
+
+            for feed in feeds {
+                if let Err(e) = feed_stmt.execute([
+                    feed.id(),
+                    feed.title(),
+                    feed.description(),
+                    "[]",
+                    feed.url(),
+                    feed.link(),
+                    feed.ttl().unwrap_or("NULL"),
+                    feed.pub_date().unwrap_or("NULL"),
+                    feed.last_fetched().unwrap_or("NULL"),
+                ]) {
+                    error!("{e:?}");
+                    return Err(StorageError);
+                }
+
+                for item in feed.items() {
+                    if let Err(e) = item_stmt.execute([
+                        item.id(),
+                        item.feed_id(),
+                        item.title().unwrap_or("NULL"),
+                        item.author().unwrap_or("NULL"),
+                        item.content().unwrap_or("NULL"),
+                        item.description().unwrap_or("NULL"),
+                        item.description().unwrap_or("NULL"),
+                        "[]",
+                        item.link().unwrap_or("NULL"),
+                        item.pub_date().unwrap_or("NULL"),
+                    ]) {
+                        error!("{e:?}");
+                        return Err(StorageError);
+                    }
+                }
+
+                events.push(StorageEvent::Insert);
+            }
+            return Ok(events);
+        } else {
+            error!("");
+            Err(StorageError)
+        }
     }
 
-    fn write_item(&self, item: &Item) -> Result<StorageEvent, StorageError> {
+    pub fn write_item(&self, item: &Item) -> Result<StorageEvent, StorageError> {
         let stmt = "INSERT OR REPLACE INTO items(
             id,
             feed_id,
@@ -191,7 +334,17 @@ impl Storage<StorageError> for SQLiteStorage {
         }
     }
 
-    fn delete_feed_with_url(&self, url: &str) -> Result<StorageEvent, StorageError> {
-        todo!()
+    pub fn delete_feed_with_url(&self, url: &str) -> Result<StorageEvent, StorageError> {
+        let stmt = "DELETE FROM feeds WHERE url = ?1";
+        let mut stmt = self.conn.prepare_cached(stmt).map_err(|_| StorageError)?;
+
+        match stmt.execute([url]) {
+            Ok(delete_count) if delete_count > 0 => Ok(StorageEvent::Delete),
+            Ok(_) => Ok(StorageEvent::NoOp),
+            Err(_) => {
+                error!("Failed to delete feed with url {}", url);
+                Err(StorageError)
+            }
+        }
     }
 }

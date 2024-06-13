@@ -1,7 +1,8 @@
 use super::RepositoryEvent;
+use super::storage::sqlite::SQLiteStorage;
 use crate::config::Config;
 use crate::feed::Feed;
-use crate::repo::storage::{Storage, StorageError, StorageEvent};
+use crate::repo::storage::{StorageError, StorageEvent};
 use crate::report;
 use crate::util::sort_feeds;
 use anyhow::Result;
@@ -21,8 +22,8 @@ enum FetchErr {
     Parse,
 }
 
-pub struct Repository<S: Storage<StorageError>> {
-    storage: S,
+pub struct Repository {
+    storage: SQLiteStorage,
     app_tx: mpsc::UnboundedSender<RepositoryEvent>,
     storage_tx: mpsc::UnboundedSender<RepositoryEvent>,
     storage_rx: mpsc::UnboundedReceiver<RepositoryEvent>,
@@ -30,15 +31,15 @@ pub struct Repository<S: Storage<StorageError>> {
     handle_many: Option<JoinHandle<()>>,
 }
 
-impl<S: Storage<StorageError>> Debug for Repository<S> {
+impl Debug for Repository {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str("Database {}")
     }
 }
 
-impl<S: Storage<StorageError>> Repository<S> {
+impl Repository {
     pub fn init(config: &Config, app_tx: UnboundedSender<RepositoryEvent>) -> Result<Self> {
-        let storage = S::init(config);
+        let storage = SQLiteStorage::init(config);
 
         let (storage_tx, storage_rx) = mpsc::unbounded_channel::<RepositoryEvent>();
 
@@ -76,7 +77,7 @@ impl<S: Storage<StorageError>> Repository<S> {
                     self.handle_many = None;
                 }
                 Some(RepositoryEvent::RetrievedOne(feed)) => {
-                    report!(self.storage.write_feed(&feed), "Failed to write feed");
+                    report!(self.storage.write_feed(&feed, None), "Failed to write feed");
                     self.app_tx
                         .send(RepositoryEvent::RetrievedOne(feed))
                         .expect("Failed to send app message");

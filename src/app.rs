@@ -1,6 +1,6 @@
 use crate::config::Config;
 use crate::feed::{Feed, Item};
-use crate::repo::{storage::sqlite::SQLiteStorage, Repository, RepositoryEvent};
+use crate::repo::{Repository, RepositoryEvent};
 use anyhow::Result;
 use clap::Parser;
 use std::error;
@@ -93,7 +93,7 @@ impl FromStr for ConsoleCommand {
 #[derive(Debug)]
 pub struct App {
     pub config: Config,
-    pub repo: Repository<SQLiteStorage>,
+    pub repo: Repository,
     pub running: bool,
     pub active_view: View,
     pub active_tab: Tab,
