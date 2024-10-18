@@ -1,8 +1,7 @@
 use super::{StorageError, StorageEvent};
 use crate::config::Config;
 use crate::feed::{Feed, Item};
-use crate::{report, util};
-use log::{error, info, warn};
+use crate::util;
 use rusqlite::{Connection, Result, Row, Transaction};
 
 pub struct SQLiteStorage {
@@ -69,7 +68,7 @@ impl SQLiteStorage {
         )";
 
         let mut stmt = tx.prepare_cached(stmt).map_err(|err| {
-            warn!("{:?}", err);
+            log::warn!("{:?}", err);
             StorageError
         })?;
 
@@ -92,7 +91,7 @@ impl SQLiteStorage {
                 Ok(StorageEvent::Insert)
             }
             Err(err) => {
-                error!("{:?}", err);
+                log::error!("{:?}", err);
                 Err(StorageError)
             }
         }
@@ -122,7 +121,7 @@ impl SQLiteStorage {
             match self.read_items_for_feed_id(feed.id()) {
                 Ok(items) => feed.items = items,
                 Err(_) => {
-                    error!("Failed to fetch items for feed {}", feed.id());
+                    log::error!("Failed to fetch items for feed {}", feed.id());
                 }
             }
             Ok(feed)
@@ -175,7 +174,7 @@ impl SQLiteStorage {
             self.conn.prepare_cached(stmt)
         })
         .map_err(|err| {
-            warn!("{:?}", err);
+            log::warn!("{:?}", err);
             StorageError
         })?;
 
@@ -198,7 +197,7 @@ impl SQLiteStorage {
                 Ok(StorageEvent::Insert)
             }
             Err(err) => {
-                error!("{:?}", err);
+                log::error!("{:?}", err);
                 Err(StorageError)
             }
         }
@@ -238,12 +237,12 @@ impl SQLiteStorage {
                 )";
 
             let mut feed_stmt = tx.prepare_cached(feed_stmt).map_err(|err| {
-                warn!("{:?}", err);
+                log::warn!("{:?}", err);
                 StorageError
             })?;
 
             let mut item_stmt = tx.prepare_cached(item_stmt).map_err(|err| {
-                warn!("{:?}", err);
+                log::warn!("{:?}", err);
                 StorageError
             })?;
 
@@ -261,7 +260,7 @@ impl SQLiteStorage {
                     feed.pub_date().unwrap_or("NULL"),
                     feed.last_fetched().unwrap_or("NULL"),
                 ]) {
-                    error!("{e:?}");
+                    log::error!("{e:?}");
                     return Err(StorageError);
                 }
 
@@ -278,7 +277,7 @@ impl SQLiteStorage {
                         item.link().unwrap_or("NULL"),
                         item.pub_date().unwrap_or("NULL"),
                     ]) {
-                        error!("{e:?}");
+                        log::error!("{e:?}");
                         return Err(StorageError);
                     }
                 }
@@ -287,7 +286,7 @@ impl SQLiteStorage {
             }
             return Ok(events);
         } else {
-            error!("");
+            log::error!("");
             Err(StorageError)
         }
     }
@@ -310,7 +309,7 @@ impl SQLiteStorage {
         )";
 
         let mut stmt = self.conn.prepare_cached(stmt).map_err(|err| {
-            warn!("{:?}", err);
+            log::warn!("{:?}", err);
             StorageError
         })?;
 
@@ -328,7 +327,7 @@ impl SQLiteStorage {
         ]) {
             Ok(_) => Ok(StorageEvent::Insert),
             Err(err) => {
-                error!("{:?}", err);
+                log::error!("{:?}", err);
                 Err(StorageError)
             }
         }
@@ -342,7 +341,7 @@ impl SQLiteStorage {
             Ok(delete_count) if delete_count > 0 => Ok(StorageEvent::Delete),
             Ok(_) => Ok(StorageEvent::NoOp),
             Err(_) => {
-                error!("Failed to delete feed with url {}", url);
+                log::error!("Failed to delete feed with url {}", url);
                 Err(StorageError)
             }
         }

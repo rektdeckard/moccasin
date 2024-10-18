@@ -1,13 +1,12 @@
 use anyhow;
 use chrono::prelude::*;
-use ducktype::DuckType;
 use rss::{Channel, Item as ChannelItem};
 use serde::{Deserialize, Serialize};
 use std::io::BufRead;
 
 mod html;
 
-#[derive(Clone, Debug, Serialize, Deserialize, DuckType)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct Feed {
     pub(crate) id: String,
     pub(crate) title: String,

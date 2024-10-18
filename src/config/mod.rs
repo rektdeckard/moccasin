@@ -10,8 +10,6 @@ use std::{fs, fs::File};
 use toml::{Table, Value};
 use toml_edit::{value, Array, Document};
 
-use log::{info, warn};
-
 mod theme;
 
 const DEFAULT_CONFIG_FILE: &'static str = "moccasin.toml";
@@ -96,10 +94,12 @@ impl Config {
                 .config_local_dir()
                 .to_owned();
             let file_path = dir_path.join(DEFAULT_CONFIG_FILE).to_owned();
+            fs::create_dir_all(&dir_path)?;
             (dir_path, file_path)
         };
 
         if cfg!(debug_assertions) {
+            dbg!(&dir_path.join("moccasin.log"));
             let file = OpenOptions::new()
                 .create(true)
                 .write(true)
@@ -178,7 +178,7 @@ impl Config {
 
     pub fn add_feed_url(&mut self, url: &str) -> Result<()> {
         if !self.feed_urls().contains(url) {
-            info!("Adding new feed for {}", url);
+            log::info!("Adding new feed for {}", url);
             self.feed_urls.insert(url.into());
             self.write_config()?;
         }
@@ -187,7 +187,7 @@ impl Config {
 
     pub fn remove_feed_url(&mut self, url: &str) -> Result<()> {
         if self.feed_urls().contains(url) {
-            info!("Deleting feed for {}", url);
+            log::info!("Deleting feed for {}", url);
             self.feed_urls.remove(url);
             self.write_config()?;
         }

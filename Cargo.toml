@@ -22,7 +22,6 @@ clap = { version = "4.4", features = ["derive"] }
 colorsys = "0.6"
 crossterm = "0.27"
 directories = "5"
-ducktype = { path = "../ducktype" }
 futures = "0.3"
 html-escape = "0.2"
 html_parser = "0.7.0"
