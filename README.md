@@ -32,6 +32,10 @@ cd /usr/pkgsrc/news/moccasin
 make install
 ```
 
+### Nix
+
+moccasin is available as a Nix flake: `github:rektdeckard/moccasin`.
+
 ## Usage
 
 Since "moccasin" is hard to spell and has too many letters, the executable is just called `mcsn`.
