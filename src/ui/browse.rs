@@ -22,26 +22,8 @@ pub fn render_browse_area(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
         .split(area);
 
     let left = Block::default()
-        .title("Feeds")
         .title_alignment(Alignment::Left)
-        .title_style(Style::default().bg(Color::White).fg(Color::Red))
-        .padding(if app.should_render_feeds_scroll() {
-            Padding {
-                top: 1,
-                bottom: 1,
-                left: 1,
-                right: 2,
-            }
-        } else {
-            Padding::uniform(1)
-        })
-        .borders(Borders::ALL)
-        .border_style(if app.active_view == View::MainList {
-            app.config.theme().active_border()
-        } else {
-            app.config.theme().border()
-        })
-        .border_type(BorderType::Plain);
+        .title_style(Style::default().bg(Color::White).fg(Color::Red));
 
     let feeds_list = List::new(
         app.feeds
@@ -65,26 +47,7 @@ pub fn render_browse_area(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
         .and_then(|i| app.feeds.items().get(i));
 
     if let Some(feed) = current_feed {
-        let block = Block::default()
-            .title(feed.title())
-            .title_alignment(Alignment::Left)
-            .padding(if app.should_render_items_scroll() {
-                Padding {
-                    top: 1,
-                    bottom: 1,
-                    left: 1,
-                    right: 2,
-                }
-            } else {
-                Padding::uniform(1)
-            })
-            .borders(Borders::ALL)
-            .border_style(if app.active_view == View::SubList {
-                app.config.theme().active_border()
-            } else {
-                app.config.theme().border()
-            })
-            .border_type(BorderType::Plain);
+        let block = Block::default().borders(Borders::LEFT);
 
         let items_list = List::new(
             feed.items()
@@ -145,67 +108,41 @@ pub fn render_browse_area(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
 
         if let Some(detail) = &app.current_item() {
             let block = Block::default()
-                .title("Detail")
-                .title_alignment(Alignment::Left)
-                .padding(Padding::uniform(1))
                 .style(app.config.theme().base())
-                .borders(Borders::ALL)
-                .border_style(if app.active_view == View::Detail {
-                    app.config.theme().active_border()
-                } else {
-                    app.config.theme().border()
-                });
-
-            frame.render_widget(block, chunks[2]);
-
-            let content_chunks = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Min(1),
-                    Constraint::Min(1),
-                    Constraint::Min(1),
-                    Constraint::Length(1),
-                    Constraint::Min(1),
-                ])
-                .margin(2)
-                .split(chunks[2]);
-
-            let title = Paragraph::new(detail.title().unwrap_or("[no title]"))
-                .style(Style::default().add_modifier(Modifier::ITALIC))
-                .wrap(Wrap { trim: true })
-                .alignment(Alignment::Center);
-
-            let author = Paragraph::new(detail.author().unwrap_or("[anonymous]"))
-                .alignment(Alignment::Center);
-
-            let date = Paragraph::new(detail.pub_date().unwrap_or("[no date]"))
-                .alignment(Alignment::Center);
-
-            let body = Paragraph::new(detail.description().unwrap_or("[no content]"))
-                .wrap(Wrap { trim: true })
-                .block(Block::default().padding(Padding {
-                    top: 0,
-                    bottom: 0,
+                .padding(Padding {
                     left: 1,
                     right: if app.should_render_detail_scroll() {
                         2
                     } else {
                         1
                     },
-                }))
+                    ..Default::default()
+                })
+                .borders(Borders::LEFT);
+
+            frame.render_widget(block, chunks[2]);
+
+            let content_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([Constraint::Min(3), Constraint::Fill(10)])
+                .horizontal_margin(2)
+                .split(chunks[2]);
+
+            let title = Line::from(detail.title().unwrap_or("[untitled]"))
+                .style(Style::default().add_modifier(Modifier::ITALIC));
+            let author = Line::from(format!("by {}", detail.author().unwrap_or("[anonymous]")));
+            let date = Line::from(detail.pub_date().unwrap_or("[no date]"));
+
+            let body = Paragraph::new(detail.description().unwrap_or("[no content]"))
+                .wrap(Wrap { trim: true })
                 .scroll((app.detail_scroll_index, 0));
 
-            frame.render_widget(title, content_chunks[0]);
-            frame.render_widget(author, content_chunks[1]);
-            frame.render_widget(date, content_chunks[2]);
-            frame.render_widget(
-                Block::default()
-                    .borders(Borders::TOP)
-                    .border_style(app.config.theme().border())
-                    .padding(Padding::vertical(1)),
-                content_chunks[3],
-            );
-            frame.render_widget(body, content_chunks[4]);
+            let metadata = Paragraph::new(vec![title, author, date])
+                .wrap(Wrap { trim: true })
+                .block(Block::default().borders(Borders::BOTTOM));
+
+            frame.render_widget(metadata, content_chunks[0]);
+            frame.render_widget(body, content_chunks[1]);
 
             app.detail_scroll = app.detail_scroll.content_length(48);
             if app.should_render_detail_scroll() {
