@@ -12,15 +12,15 @@ pub mod detail;
 pub mod themed;
 
 /// Renders the user interface widgets.
-pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
+pub fn render(app: &mut App, frame: &mut Frame<'_>) {
     let wrapper = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(2),
+            Constraint::Length(1),
             Constraint::Min(10),
-            Constraint::Length(2),
+            Constraint::Length(1),
         ])
-        .split(frame.size());
+        .split(frame.area());
 
     render_tabs_bar(app, frame, wrapper[0]);
 
@@ -34,39 +34,36 @@ pub fn render<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>) {
     render_status_bar(app, frame, wrapper[2]);
 
     if app.show_keybinds {
-        render_keybinds_overlay(app, frame, frame.size());
+        render_keybinds_overlay(app, frame, frame.area());
     }
 }
 
-fn render_tabs_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
+fn render_tabs_bar(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
     let browse = Tab::Browse.to_string().clone();
     let (b, rowse) = browse.split_at(1);
     let b = b.underlined().to_owned();
-    let browse = Line::from(vec![b, rowse.into()]);
+    let browse = Line::from(vec![" ".into(), b, rowse.into(), " ".into()]);
 
     let favorites = Tab::Favorites.to_string().clone();
     let (f, avorites) = favorites.split_at(1);
     let f = f.underlined().to_owned();
-    let favorites = Line::from(vec![f, avorites.into()]);
+    let favorites = Line::from(vec![" ".into(), f, avorites.into(), " ".into()]);
 
     let tags = Tab::Tags.to_string().clone();
     let (t, ags) = tags.split_at(1);
     let t = t.underlined().to_owned();
-    let tags = Line::from(vec![t, ags.into()]);
+    let tags = Line::from(vec![" ".into(), t, ags.into(), " ".into()]);
 
     let tabs = Tabs::new(vec![browse, favorites, tags])
-        .block(
-            Block::default()
-                .style(app.config.theme().status())
-                .borders(Borders::BOTTOM)
-                .border_style(app.config.theme().active_border()),
-        )
+        .style(app.config.theme().overlay())
+        .highlight_style(app.config.theme().selection())
         .select(app.active_tab.index_of())
-        .highlight_style(app.config.theme().selection());
+        .padding("", "")
+        .divider("");
     frame.render_widget(tabs, area);
 }
 
-fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
+fn render_keybinds_overlay(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
     let area = centered_rect_ratio((5, 9), (5, 9), area);
 
     let block = Block::default()
@@ -115,29 +112,23 @@ fn render_keybinds_overlay<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, 
     frame.render_widget(console_keybinds, layout[1]);
 }
 
-fn render_console_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
-    let block = Block::default()
-        .style(app.config.theme().status())
-        .borders(Borders::TOP)
-        .border_style(app.config.theme().active_border());
+fn render_console_area(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
+    let block = Block::default().style(app.config.theme().status());
 
     let input_field = Paragraph::new(app.command_state.input.as_str()).block(block);
 
     frame.render_widget(input_field, area);
-    frame.set_cursor(
+    frame.set_cursor_position((
         // Draw the cursor at the current position in the input field.
         // This position is can be controlled via the left and right arrow key
         area.x + app.command_state.cursor_position as u16,
         // Move one line down, from the border to the input line
         area.y + 1,
-    )
+    ));
 }
 
-fn render_status_bar<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
-    let block = Block::default()
-        .style(app.config.theme().status())
-        .borders(Borders::TOP)
-        .border_style(app.config.theme().active_border());
+fn render_status_bar(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
+    let block = Block::default().style(app.config.theme().status());
 
     if app.should_render_console() {
         render_console_area(app, frame, area)

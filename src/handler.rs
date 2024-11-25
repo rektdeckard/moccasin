@@ -75,10 +75,10 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
         KeyCode::Left | KeyCode::Char('h') => {
             app.prev_view(false);
         }
-        KeyCode::Tab => {
+        KeyCode::Tab | KeyCode::Char('n') if key_event.modifiers == KeyModifiers::CONTROL => {
             app.next_tab();
         }
-        KeyCode::BackTab => {
+        KeyCode::BackTab | KeyCode::Char('p') if key_event.modifiers == KeyModifiers::CONTROL => {
             app.prev_tab();
         }
         KeyCode::Char('b') => app.set_tab(0),
