@@ -1,16 +1,14 @@
 use crate::app::{App, View};
 use tui::{
-    backend::Backend,
     layout::Alignment,
     prelude::*,
     style::{Color, Modifier, Style},
-    widgets::{
-        scrollbar, Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Scrollbar, Wrap,
-    },
+    symbols::scrollbar,
+    widgets::{Block, BorderType, Borders, List, ListItem, Padding, Paragraph, Scrollbar, Wrap},
     Frame,
 };
 
-pub fn render_browse_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, area: Rect) {
+pub fn render_browse_area(app: &mut App, frame: &mut Frame<'_>, area: Rect) {
     let chunks = Layout::default()
         .direction(Direction::Horizontal)
         .constraints(
@@ -112,10 +110,10 @@ pub fn render_browse_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, a
                     Scrollbar::default()
                         .begin_symbol(None)
                         .end_symbol(None)
-                        .track_symbol(scrollbar::VERTICAL.thumb)
+                        .track_symbol(Some(scrollbar::VERTICAL.thumb))
                         .track_style(app.config.theme().scrollbar_track())
                         .thumb_style(app.config.theme().scrollbar_thumb()),
-                    chunks[1].inner(&Margin {
+                    chunks[1].inner(Margin {
                         vertical: 1,
                         horizontal: 1,
                     }),
@@ -133,10 +131,10 @@ pub fn render_browse_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, a
                     Scrollbar::default()
                         .begin_symbol(None)
                         .end_symbol(None)
-                        .track_symbol(scrollbar::VERTICAL.thumb)
+                        .track_symbol(Some(scrollbar::VERTICAL.thumb))
                         .track_style(app.config.theme().scrollbar_track())
                         .thumb_style(app.config.theme().scrollbar_thumb()),
-                    chunks[1].union(chunks[2]).inner(&Margin {
+                    chunks[1].union(chunks[2]).inner(Margin {
                         vertical: 1,
                         horizontal: 1,
                     }),
@@ -215,7 +213,7 @@ pub fn render_browse_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, a
                     Scrollbar::default()
                         .begin_symbol(None)
                         .end_symbol(None)
-                        .track_symbol(scrollbar::VERTICAL.thumb)
+                        .track_symbol(Some(scrollbar::VERTICAL.thumb))
                         .track_style(app.config.theme().scrollbar_track())
                         .thumb_style(app.config.theme().scrollbar_thumb()),
                     content_chunks[4],
@@ -230,10 +228,10 @@ pub fn render_browse_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, a
                 Scrollbar::default()
                     .begin_symbol(None)
                     .end_symbol(None)
-                    .track_symbol(scrollbar::VERTICAL.thumb)
+                    .track_symbol(Some(scrollbar::VERTICAL.thumb))
                     .track_style(app.config.theme().scrollbar_track())
                     .thumb_style(app.config.theme().scrollbar_thumb()),
-                chunks[0].inner(&Margin {
+                chunks[0].inner(Margin {
                     vertical: 1,
                     horizontal: 1,
                 }),
@@ -247,10 +245,10 @@ pub fn render_browse_area<B: Backend>(app: &mut App, frame: &mut Frame<'_, B>, a
                 Scrollbar::default()
                     .begin_symbol(None)
                     .end_symbol(None)
-                    .track_symbol(scrollbar::VERTICAL.thumb)
+                    .track_symbol(Some(scrollbar::VERTICAL.thumb))
                     .track_style(app.config.theme().scrollbar_track())
                     .thumb_style(app.config.theme().scrollbar_thumb()),
-                area.inner(&Margin {
+                area.inner(Margin {
                     vertical: 1,
                     horizontal: 1,
                 }),

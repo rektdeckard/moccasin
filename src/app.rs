@@ -119,7 +119,7 @@ impl App {
         let mut repo = Repository::init(&config, tx)?;
 
         let items = repo.read_all(&config).unwrap_or_default();
-        let feeds_count = items.len() as u16;
+        let feeds_count = items.len();
 
         Ok(Self {
             config,
@@ -260,14 +260,12 @@ impl App {
             self.feeds
                 .state
                 .selected()
-                .unwrap_or(self.feeds.state.offset()) as u16,
+                .unwrap_or(self.feeds.state.offset()),
         );
 
         if let Some(channel) = self.current_feed() {
             self.items.items = channel.items().into();
-            self.items_scroll = self
-                .items_scroll
-                .content_length(self.items.items.len() as u16);
+            self.items_scroll = self.items_scroll.content_length(self.items.items.len());
         }
     }
 
@@ -277,14 +275,12 @@ impl App {
             self.feeds
                 .state
                 .selected()
-                .unwrap_or(self.feeds.state.offset()) as u16,
+                .unwrap_or(self.feeds.state.offset()),
         );
 
         if let Some(channel) = self.current_feed() {
             self.items.items = channel.items().into();
-            self.items_scroll = self
-                .items_scroll
-                .content_length(self.items.items.len() as u16);
+            self.items_scroll = self.items_scroll.content_length(self.items.items.len());
         }
     }
 
@@ -294,7 +290,7 @@ impl App {
             self.items
                 .state
                 .selected()
-                .unwrap_or(self.items.state.offset()) as u16,
+                .unwrap_or(self.items.state.offset()),
         );
     }
 
@@ -304,7 +300,7 @@ impl App {
             self.items
                 .state
                 .selected()
-                .unwrap_or(self.items.state.offset()) as u16,
+                .unwrap_or(self.items.state.offset()),
         );
     }
 
