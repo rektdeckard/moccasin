@@ -1,2 +1,5 @@
 /target
+
+# nix
 .direnv
+result
